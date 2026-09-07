@@ -7,7 +7,23 @@ import {
   withoutNulls,
 } from "./tools.js";
 
-const USE_SDK = new URLSearchParams(location.search).get("sdk") !== "false";
+const params = new URLSearchParams(location.search);
+const USE_SDK = params.get("sdk") !== "false";
+
+const COLLECTOR_OTLP_URL = "http://localhost:4318/v1/traces";
+const MLFLOW_OTLP_URL = "http://localhost:5000/v1/traces";
+
+/**
+ * `?experiment=<id>` points the exporter at a local MLflow, which ingests OTLP
+ * but needs to be told which experiment to file traces under. `?otlp=<url>`
+ * overrides the destination for any other collector.
+ */
+const experimentId = params.get("experiment");
+const otlpUrl =
+  params.get("otlp") ?? (experimentId ? MLFLOW_OTLP_URL : COLLECTOR_OTLP_URL);
+const otlpHeaders: Record<string, string> = experimentId
+  ? { "x-mlflow-experiment-id": experimentId }
+  : {};
 
 const modeInfo = document.getElementById("mode-info");
 const output = document.getElementById("output");
@@ -16,16 +32,22 @@ const form = document.getElementById("form") as HTMLFormElement;
 
 if (modeInfo) {
   modeInfo.textContent = USE_SDK
-    ? "Mode: Production SDK (OTLP export enabled)"
+    ? `Mode: Production SDK — exporting to ${otlpUrl}${
+        experimentId ? ` (MLflow experiment ${experimentId})` : ""
+      }`
     : "Mode: Extension only (no SDK — use DevTools extension)";
 }
 
 if (USE_SDK) {
   const sdk = new WebAISDK({
     serviceName: "playground",
-    otlpUrl: "http://localhost:4318/v1/traces",
+    otlpUrl,
+    otlpHeaders,
     captureInput: true,
     captureOutput: true,
+    // MLflow builds its list previews and chat view from these; other backends
+    // read the GenAI attributes and do not need them.
+    includeMlflowPreview: Boolean(experimentId),
   });
   await sdk.start();
 }

@@ -111,8 +111,13 @@ The injected provider is deliberately **not** registered as the page's global Op
 pnpm --filter @web-ai-otel/playground dev
 ```
 
-- Default: SDK mode with OTLP export
-- Extension-only: `http://localhost:5173?sdk=false` (no SDK; use the extension)
+- Default: SDK mode, exporting OTLP to a collector on `localhost:4318`
+- Extension-only: `?sdk=false` (no SDK; use the extension)
+- MLflow: `?experiment=<id>` exports to a local MLflow instead, which ingests OTLP directly and renders the traces from the attributes we already emit. `?otlp=<url>` points anywhere else.
+
+```bash
+uvx mlflow server   # http://localhost:5000, then open ?experiment=0
+```
 
 ## Packages
 
