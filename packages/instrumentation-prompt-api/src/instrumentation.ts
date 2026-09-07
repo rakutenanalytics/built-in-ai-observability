@@ -8,11 +8,15 @@ import {
   trace,
 } from "@opentelemetry/api";
 import {
+  type AssistantTurn,
   DEFAULT_CAPTURE_CONFIG,
   DEFAULT_PROVIDER_NAME,
   ERROR_TYPE,
+  FINISH_STOP,
+  FINISH_TOOL_CALL,
   GEN_AI,
   type InstrumentationConfig,
+  OPERATION_INVOKE_AGENT,
   PROMPT_API_NAME,
   readAssistantTurn,
   readContextUsage,
@@ -27,6 +31,8 @@ import {
   attachOverflowListeners,
   createSessionAttributes,
   createSessionState,
+  exchangeAttributes,
+  exchangeResultAttributes,
   promptApiAttributes,
   reconcileContextOverflow,
   requestAttributes,
@@ -38,9 +44,6 @@ import { emitToolExecutionSpans, registerToolCalls } from "./tool-spans.js";
 const MS_PER_SECOND = 1000;
 const DOWNLOAD_COMPLETE = 1;
 const DOWNLOAD_NONE = 0;
-
-const FINISH_STOP = "stop";
-const FINISH_TOOL_CALL = "tool_call";
 
 function finishReasonFor(err: unknown): string {
   return err instanceof Error && err.name === "AbortError" ? "abort" : "error";
@@ -111,22 +114,74 @@ export function wrapSession(
   attachOverflowListeners(session, state);
 
   /**
+   * Ends the exchange in flight. Called with the answering turn's output, or
+   * with nothing when the page moved on without ever coming back with the tool
+   * results, which leaves the exchange abandoned rather than answered.
+   */
+  const closeExchange = (output?: string | AssistantTurn): void => {
+    const { exchange } = state;
+    if (!exchange) {
+      return;
+    }
+    state.exchange = undefined;
+    state.pendingCalls = [];
+
+    exchange.span.setAttributes(
+      exchangeResultAttributes({ exchange, output, config })
+    );
+    exchange.span.setStatus({ code: SpanStatusCode.OK });
+    exchange.span.end();
+  };
+
+  /**
+   * Opens an exchange: one `invoke_agent` span to hold every turn and tool run
+   * that goes into answering a single question. Only sessions that declared
+   * tools can need more than one turn, so a session without them keeps the
+   * plain single-span shape.
+   */
+  const openExchange = (input: LanguageModelPrompt): Context | undefined => {
+    if (state.tools.size === 0) {
+      return;
+    }
+
+    const span = tracer.startSpan(
+      OPERATION_INVOKE_AGENT,
+      {
+        kind: SpanKind.INTERNAL,
+        attributes: exchangeAttributes({
+          state,
+          input,
+          config,
+          providerName,
+        }),
+      },
+      context.active()
+    );
+    const spanContext = trace.setSpan(context.active(), span);
+    state.exchange = { span, context: spanContext, turns: 0, toolCalls: 0 };
+    return spanContext;
+  };
+
+  /**
    * Opens a turn and decides where it hangs in the trace. A turn carrying tool
-   * responses continues the exchange already in flight, so the whole
-   * question-tools-answer sequence lands in one trace; anything else starts a
-   * new exchange.
+   * responses continues the exchange already in flight; anything else is a new
+   * question, so it ends whatever came before and starts its own exchange.
    */
   const beginTurn = (input: LanguageModelPrompt) => {
     const traffic = toolTrafficFrom(input);
-    const continuation = traffic.responses.length > 0;
-    const parent =
-      continuation && state.exchangeContext
-        ? state.exchangeContext
-        : context.active();
+    const continuation =
+      traffic.responses.length > 0 && Boolean(state.exchange);
 
-    // Emitted before the turn opens, so each tool span sits under the turn that
-    // asked for it rather than the one being told the results.
-    if (continuation) {
+    if (!continuation) {
+      closeExchange();
+    }
+    const parent =
+      (continuation ? state.exchange?.context : openExchange(input)) ??
+      context.active();
+
+    // Emitted before the turn opens so a tool run sits beside the turns rather
+    // than inside the one being told its result.
+    if (traffic.responses.length > 0) {
       emitToolExecutionSpans({
         tracer,
         state,
@@ -137,22 +192,35 @@ export function wrapSession(
       });
     }
 
+    if (state.exchange) {
+      state.exchange.turns += 1;
+    }
+
     return { traffic, continuation, parent };
   };
 
-  /** Makes the turn active, and roots the exchange on its opening turn. */
-  const activate = (
-    parent: Context,
-    span: Span,
-    continuation: boolean
-  ): Context => {
-    const spanContext = trace.setSpan(parent, span);
-    if (!(continuation && state.exchangeContext)) {
-      state.exchangeContext = spanContext;
-    }
+  const activate = (parent: Context, span: Span): Context => {
     state.activeSpans.add(span);
-    return spanContext;
+    return trace.setSpan(parent, span);
   };
+
+  /**
+   * Ends the turn's part in the exchange. A turn that asked for no tools is the
+   * answer the exchange was waiting for; a turn that failed abandons it. Called
+   * once the turn's own span has ended, so the exchange outlives what it holds.
+   */
+  const settleTurn = (turn: AssistantTurn | undefined): void => {
+    if (state.exchange && turn) {
+      state.exchange.toolCalls += turn.toolCalls.length;
+    }
+    if (!turn || turn.toolCalls.length === 0) {
+      closeExchange(turn);
+    }
+  };
+
+  /** Tool runs sit beside the turns, since they run between them, not within. */
+  const toolParent = (fallback: Context): Context =>
+    state.exchange?.context ?? fallback;
 
   const startTurn = (
     input: LanguageModelPrompt,
@@ -174,7 +242,7 @@ export function wrapSession(
     input: LanguageModelPrompt,
     opts?: LanguageModelPromptOptions
   ): Promise<LanguageModelOutput> => {
-    const { traffic, continuation, parent } = beginTurn(input);
+    const { traffic, parent } = beginTurn(input);
     const windowTokens = readContextWindow(session);
     const before = readContextUsage(session);
 
@@ -186,13 +254,14 @@ export function wrapSession(
       },
       parent
     );
-    const spanContext = activate(parent, span, continuation);
+    const spanContext = activate(parent, span);
 
     return context.with(spanContext, async () => {
+      let turn: AssistantTurn | undefined;
       try {
         const output = await session.prompt(input, opts);
         // A turn asking for a tool resolves to content parts, not a string.
-        const turn = readAssistantTurn(output);
+        turn = readAssistantTurn(output);
         const after = readContextUsage(session);
         reconcileContextOverflow(span, state, before, after);
         span.setAttributes(
@@ -208,7 +277,7 @@ export function wrapSession(
             after,
           })
         );
-        registerToolCalls(state, turn.toolCalls, spanContext);
+        registerToolCalls(state, turn.toolCalls, toolParent(spanContext));
         span.setStatus({ code: SpanStatusCode.OK });
         return output;
       } catch (err) {
@@ -230,6 +299,7 @@ export function wrapSession(
       } finally {
         state.activeSpans.delete(span);
         span.end();
+        settleTurn(turn);
       }
     });
   };
@@ -238,7 +308,7 @@ export function wrapSession(
     input: LanguageModelPrompt,
     opts?: LanguageModelPromptOptions
   ): ReadableStream<LanguageModelStreamChunk> => {
-    const { traffic, continuation, parent } = beginTurn(input);
+    const { traffic, parent } = beginTurn(input);
     const windowTokens = readContextWindow(session);
     const before = readContextUsage(session);
 
@@ -250,7 +320,7 @@ export function wrapSession(
       },
       parent
     );
-    const spanContext = activate(parent, span, continuation);
+    const spanContext = activate(parent, span);
 
     const startedAt = performance.now();
     let firstChunkAt: number | null = null;
@@ -303,10 +373,12 @@ export function wrapSession(
 
     return new ReadableStream<LanguageModelStreamChunk>({
       async start(controller) {
+        let turn: AssistantTurn | undefined;
         try {
           await context.with(spanContext, () => pump(controller));
+          turn = { text, toolCalls };
           finalize(toolCalls.length > 0 ? FINISH_TOOL_CALL : FINISH_STOP);
-          registerToolCalls(state, toolCalls, spanContext);
+          registerToolCalls(state, toolCalls, toolParent(spanContext));
           span.setStatus({ code: SpanStatusCode.OK });
           controller.close();
         } catch (err) {
@@ -323,12 +395,16 @@ export function wrapSession(
           }
           state.activeSpans.delete(span);
           span.end();
+          settleTurn(turn);
         }
       },
     });
   };
 
   const tracedDestroy = () => {
+    // Destroying mid-exchange means the tool results are never coming.
+    closeExchange();
+
     const span = tracer.startSpan("web_ai.destroy_session", {
       kind: SpanKind.INTERNAL,
       attributes: promptApiAttributes(state),

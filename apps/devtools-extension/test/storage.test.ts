@@ -39,6 +39,7 @@ function span(overrides: {
   name: string;
   traceId: string;
   spanId: string;
+  parentSpanId?: string;
   startMs?: number;
   endMs?: number;
   statusCode?: number;
@@ -50,6 +51,7 @@ function span(overrides: {
     protocolVersion: 1,
     traceId: overrides.traceId,
     spanId: overrides.spanId,
+    parentSpanId: overrides.parentSpanId,
     name: overrides.name,
     kind: 0,
     startTime: hr(startMs),
@@ -212,6 +214,62 @@ describe("devtools trace storage", () => {
 
     const [session] = await storage.listSessions({});
     expect(session).toMatchObject({ turnCount: 2, toolCallCount: 1 });
+  });
+
+  it("summarises a tool exchange by its root, not by its first turn", async () => {
+    // The root arrives last: it cannot end before the turns it holds.
+    const spans = [
+      span({
+        name: "generate_content",
+        traceId: "t1",
+        spanId: "s2",
+        parentSpanId: "s1",
+        startMs: 1000,
+        conversationId: CONVERSATION,
+        attributes: {
+          "gen_ai.output.messages": encodeMessages(
+            "assistant",
+            "calling get_weather"
+          ),
+        },
+      }),
+      span({
+        name: "execute_tool get_weather",
+        traceId: "t1",
+        spanId: "s3",
+        parentSpanId: "s1",
+        startMs: 1010,
+        conversationId: CONVERSATION,
+        attributes: { "gen_ai.operation.name": "execute_tool" },
+      }),
+      span({
+        name: "invoke_agent",
+        traceId: "t1",
+        spanId: "s1",
+        startMs: 1000,
+        endMs: 1100,
+        conversationId: CONVERSATION,
+        attributes: {
+          "gen_ai.operation.name": "invoke_agent",
+          "gen_ai.input.messages": encodeMessages("user", "weather in Kyoto?"),
+          "gen_ai.output.messages": encodeMessages(
+            "assistant",
+            "It is raining in Kyoto."
+          ),
+        },
+      }),
+    ];
+    for (const record of spans) {
+      await storage.storeSpan(record, TAB_A);
+    }
+
+    const [trace] = await storage.listTraces({});
+    expect(trace).toMatchObject({
+      rootSpanName: "invoke_agent",
+      request: "weather in Kyoto?",
+      response: "It is raining in Kyoto.",
+      toolCallCount: 1,
+    });
   });
 
   it("counts no tool calls for a plain turn", async () => {

@@ -59,6 +59,11 @@ export const WEB_AI = {
   TOOL_FAILED: "web_ai.tool.failed",
   /** Set on a turn that carries tool responses, continuing an earlier turn. */
   TURN_CONTINUATION: "web_ai.conversation.turn_continuation",
+  /** Totals for a whole exchange, recorded on its `invoke_agent` span. */
+  EXCHANGE_TURN_COUNT: "web_ai.exchange.turn_count",
+  EXCHANGE_TOOL_CALL_COUNT: "web_ai.exchange.tool_call_count",
+  /** Set when an exchange ends without the answer the tools were for. */
+  EXCHANGE_ABANDONED: "web_ai.exchange.abandoned",
 } as const;
 
 export const ERROR_TYPE = "error.type";
@@ -66,7 +71,16 @@ export const SESSION_ID = "session.id";
 
 export const OPERATION_GENERATE_CONTENT = "generate_content";
 export const OPERATION_EXECUTE_TOOL = "execute_tool";
+/**
+ * A question answered with the help of tools. The page runs the tool loop, so
+ * this span covers the whole exchange: the model turns, the tool runs, and the
+ * answer that ends it.
+ */
+export const OPERATION_INVOKE_AGENT = "invoke_agent";
 /** Only kind of tool the Prompt API exposes. */
 export const TOOL_TYPE_FUNCTION = "function";
+/** The two ways a turn can end: with an answer, or with a request for tools. */
+export const FINISH_STOP = "stop";
+export const FINISH_TOOL_CALL = "tool_call";
 export const DEFAULT_PROVIDER_NAME = "google.chrome";
 export const PROMPT_API_NAME = "LanguageModel";

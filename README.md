@@ -140,7 +140,9 @@ Every span carries `web_ai.api.name` so traces stay attributable once more Web A
 | --- | --- |
 | `web_ai.create_session` | `LanguageModel.create()`, including model download state |
 | `web_ai.check_availability` | `LanguageModel.availability()` |
+| `invoke_agent` | Wraps a question answered with tools; see [Traces and sessions](#traces-and-sessions) |
 | `generate_content` | `prompt()` and `promptStreaming()` |
+| `execute_tool <name>` | A tool the page ran, reconstructed from the call and its response |
 | `web_ai.clone_session` | `clone()`; keeps `gen_ai.conversation.id`, new session id |
 | `web_ai.destroy_session` | `destroy()` |
 
@@ -150,22 +152,34 @@ Every span carries `web_ai.api.name` so traces stay attributable once more Web A
 
 ## Traces and sessions
 
-Only `generate_content` is instrumented today, so each operation is its own single-span trace. That is the expected shape at this stage: once tool calling is instrumented, one trace will hold several `generate_content` spans plus the tool call and result spans beneath them.
+A trace is one question and its answer. On a session without tools that is a single `generate_content` span. On a session with tools, answering can take several model turns with tool runs in between, and the whole thing is one trace rooted on an `invoke_agent` span:
 
-Because a trace is currently one operation, conversation-level context comes from the **session**: every span carries `gen_ai.conversation.id` (mirrored to `session.id` and `web_ai.session.id`), and clones inherit the conversation while getting a fresh `web_ai.session.id` plus `web_ai.session.parent_id`.
+```
+invoke_agent                       "What is the weather and the population of Kyoto?"
+├── generate_content               asks for two tools
+├── execute_tool get_weather
+├── execute_tool get_population
+└── generate_content               "The weather in Kyoto is light rain…"
+```
+
+The turns and tool runs are **siblings**, not nested: they happen one after another, so a turn does not run inside the turn before it and a tool does not run inside the turn that asked for it — that turn has already ended. Nesting them would produce children outliving their parents, which reads as a broken timeline.
+
+The root exists because a trace is summarised from its root, and the answer only arrives on the last turn. Without it, a backend would preview the exchange by the first turn's output, which is a tool call rather than an answer. The root therefore carries the user's question as its input, the final text as its output, and `web_ai.exchange.turn_count` / `web_ai.exchange.tool_call_count`. An exchange the page never returns tool results for is closed on the next question or on `destroy()` and marked `web_ai.exchange.abandoned`.
+
+Conversation-level context comes from the **session**, which spans more than one exchange: every span carries `gen_ai.conversation.id` (mirrored to `session.id` and `web_ai.session.id`), and clones inherit the conversation while getting a fresh `web_ai.session.id` plus `web_ai.session.parent_id`.
 
 The DevTools panel therefore offers two views, mirroring how MLflow separates traces from chat sessions:
 
 | View | Shows |
 | --- | --- |
-| **Traces** | Every individual trace, newest first, with span count and duration |
+| **Traces** | Every individual trace, newest first, with the root span's request/response previews, span count and duration |
 | **Sessions** | Traces grouped by `gen_ai.conversation.id`, with request/response previews, turn count, errors, and context-window usage |
 
 Both views are scoped to the tab you are inspecting, and the header shows which tab and origin that is. Spans without a conversation (such as `web_ai.check_availability`) appear only under Traces.
 
 Stored data is a disposable local cache: traces (with their spans) and sessions are each capped independently and pruned oldest-first, and closing a tab clears its traces.
 
-When tool calling arrives, nested spans in the extension will need the parent threaded explicitly through `SessionState`, because the injected provider is not registered globally and therefore has no ambient context manager.
+Parents are threaded explicitly through `SessionState` rather than taken from ambient context, since the extension's injected provider is not registered globally and so has no context manager.
 
 ## Known limitations
 

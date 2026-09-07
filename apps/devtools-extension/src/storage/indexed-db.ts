@@ -52,6 +52,9 @@ export interface TraceSummary {
   conversationId?: string;
   /** `execute_tool` spans in the trace, so a tool exchange reads as one. */
   toolCallCount: number;
+  /** The question and the answer, both taken from the root span. */
+  request?: string;
+  response?: string;
 }
 
 /**
@@ -189,6 +192,22 @@ function originOf(span: StoredSpan): string {
   return span.source.origin ?? span.frame?.origin ?? "unknown";
 }
 
+/**
+ * Only the root span speaks for the whole trace. On a tool exchange the turns
+ * underneath it output tool calls rather than the answer, so reading them would
+ * summarise the trace by something the user never asked about.
+ */
+function rootContent(span: StoredSpan): Partial<TraceSummary> {
+  if (span.parentSpanId !== undefined) {
+    return {};
+  }
+  return {
+    rootSpanName: span.name,
+    request: previewFrom(stringAttr(span, INPUT_MESSAGES)),
+    response: previewFrom(stringAttr(span, OUTPUT_MESSAGES)),
+  };
+}
+
 function mergeTrace(
   existing: TraceSummary | undefined,
   span: StoredSpan,
@@ -208,6 +227,7 @@ function mergeTrace(
       statusCode: span.status.code,
       conversationId: span.conversationId,
       toolCallCount: countOf(isToolSpan(span)),
+      ...rootContent(span),
     };
   }
 
@@ -215,11 +235,6 @@ function mergeTrace(
   const mergedEnd = Math.max(existing.endTimeMs, endTimeMs);
   return {
     ...existing,
-    // The earliest span names the trace.
-    rootSpanName:
-      span.startTimeMs < existing.startTimeMs
-        ? span.name
-        : existing.rootSpanName,
     startTimeMs,
     endTimeMs: mergedEnd,
     durationMs: mergedEnd - startTimeMs,
@@ -228,6 +243,8 @@ function mergeTrace(
     statusCode: Math.max(existing.statusCode, span.status.code),
     conversationId: existing.conversationId ?? span.conversationId,
     toolCallCount: existing.toolCallCount + countOf(isToolSpan(span)),
+    // The root arrives last, since it cannot end before what it holds.
+    ...rootContent(span),
   };
 }
 

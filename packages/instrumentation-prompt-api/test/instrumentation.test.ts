@@ -1,4 +1,4 @@
-import type { TracerProvider } from "@opentelemetry/api";
+import type { HrTime, TracerProvider } from "@opentelemetry/api";
 import {
   BasicTracerProvider,
   InMemorySpanExporter,
@@ -56,6 +56,16 @@ function durationMs(span: ReadableSpan | undefined): number {
   const [seconds, nanos] = span?.duration ?? [0, 0];
   return seconds * MS_PER_SECOND + nanos / NANOS_PER_MS;
 }
+
+function millis([seconds, nanos]: HrTime): number {
+  return seconds * MS_PER_SECOND + nanos / NANOS_PER_MS;
+}
+
+const startedAt = (span: ReadableSpan | undefined): number =>
+  millis(span?.startTime ?? [0, 0]);
+
+const endedAt = (span: ReadableSpan | undefined): number =>
+  millis(span?.endTime ?? [0, 0]);
 
 /**
  * The real tool interfaces keep every field on the prototype, so `Object.keys()`
@@ -557,19 +567,117 @@ describe("PromptApiInstrumentation", () => {
         "24"
       );
 
-      // One question and its tool round form one trace: the continuation turn
-      // and the tool span both hang off the turn that asked for the call.
-      const traceId = first?.spanContext().traceId;
-      const rootSpanId = first?.spanContext().spanId;
-      expect(second?.spanContext().traceId).toBe(traceId);
-      expect(toolSpan?.spanContext().traceId).toBe(traceId);
-      expect(second?.parentSpanContext?.spanId).toBe(rootSpanId);
-      expect(toolSpan?.parentSpanContext?.spanId).toBe(rootSpanId);
+      // One question and its tool round form one trace, rooted on the exchange
+      // rather than on the first turn.
+      const root = spanNamed("invoke_agent");
+      const rootId = root?.spanContext().spanId;
+      expect(root?.parentSpanContext).toBeUndefined();
+      for (const span of [first, second, toolSpan]) {
+        expect(span?.spanContext().traceId).toBe(root?.spanContext().traceId);
+        expect(span?.parentSpanContext?.spanId).toBe(rootId);
+      }
 
       expect(second?.attributes["web_ai.conversation.turn_continuation"]).toBe(
         true
       );
       expect(second?.attributes["web_ai.tool.response_count"]).toBe(1);
+    });
+
+    it("answers the exchange on its root span", async () => {
+      mockSession.prompt = vi
+        .fn()
+        .mockResolvedValueOnce([
+          toolCallChunk(toolCall("get_weather", { city: "Kyoto" })),
+        ])
+        .mockResolvedValueOnce("It is raining in Kyoto.");
+
+      const session = await LanguageModel.create({ tools: [WEATHER_TOOL] });
+      await session.prompt("weather in Kyoto?");
+      await session.prompt(
+        toolResponseTurn(toolSuccess("get_weather", { tempC: 22 }))
+      );
+
+      const root = spanNamed("invoke_agent");
+      expect(root?.attributes["gen_ai.operation.name"]).toBe("invoke_agent");
+      expect(root?.attributes["web_ai.exchange.turn_count"]).toBe(2);
+      expect(root?.attributes["web_ai.exchange.tool_call_count"]).toBe(1);
+      expect(root?.attributes["gen_ai.response.finish_reasons"]).toEqual([
+        "stop",
+      ]);
+      expect(root?.attributes["web_ai.exchange.abandoned"]).toBeUndefined();
+
+      // The question and the answer, not the tool call in between.
+      expect(String(root?.attributes["gen_ai.input.messages"])).toContain(
+        "weather in Kyoto?"
+      );
+      expect(String(root?.attributes["gen_ai.output.messages"])).toContain(
+        "It is raining in Kyoto."
+      );
+    });
+
+    it("keeps the exchange around everything it holds", async () => {
+      mockSession.prompt = vi
+        .fn()
+        .mockResolvedValueOnce([
+          toolCallChunk(toolCall("get_weather", { city: "Kobe" })),
+        ])
+        .mockResolvedValueOnce("It is windy in Kobe.");
+
+      const session = await LanguageModel.create({ tools: [WEATHER_TOOL] });
+      await session.prompt("weather in Kobe?");
+      await session.prompt(
+        toolResponseTurn(toolSuccess("get_weather", { tempC: 19 }))
+      );
+
+      const root = spanNamed("invoke_agent");
+      const children = exporter
+        .getFinishedSpans()
+        .filter(
+          (span) =>
+            span.parentSpanContext?.spanId === root?.spanContext().spanId
+        );
+
+      expect(children).toHaveLength(3);
+      // Turns and tool runs happen one after another, so they are siblings in
+      // the order they ran, each inside the window of the exchange.
+      let previous = startedAt(root);
+      for (const child of children) {
+        expect(startedAt(child)).toBeGreaterThanOrEqual(previous);
+        expect(endedAt(child)).toBeLessThanOrEqual(endedAt(root));
+        previous = startedAt(child);
+      }
+      expect(children.map((child) => child.name)).toEqual([
+        "generate_content",
+        "execute_tool get_weather",
+        "generate_content",
+      ]);
+    });
+
+    it("marks an exchange the page never came back to", async () => {
+      mockSession.prompt = vi.fn(() =>
+        Promise.resolve([
+          toolCallChunk(toolCall("get_weather", { city: "Ise" })),
+        ])
+      );
+
+      const session = await LanguageModel.create({ tools: [WEATHER_TOOL] });
+      await session.prompt("weather in Ise?");
+      // No tool responses ever arrive; the page just drops the session.
+      session.destroy();
+
+      const root = spanNamed("invoke_agent");
+      expect(root?.attributes["web_ai.exchange.abandoned"]).toBe(true);
+      expect(
+        root?.attributes["gen_ai.response.finish_reasons"]
+      ).toBeUndefined();
+    });
+
+    it("leaves a session without tools as a single span", async () => {
+      const session = await LanguageModel.create();
+      await session.prompt("hello");
+
+      expect(spanNamed("invoke_agent")).toBeUndefined();
+      expect(turnSpans()[0]?.parentSpanContext).toBeUndefined();
     });
 
     it("does not charge a tool for the generation that followed its call", async () => {

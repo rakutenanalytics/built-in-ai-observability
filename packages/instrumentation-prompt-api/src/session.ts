@@ -5,10 +5,12 @@ import {
   encodeInputMessages,
   encodeOutputMessages,
   encodeSystemInstructions,
+  FINISH_STOP,
   GEN_AI,
   type InstrumentationConfig,
   mlflowChatPreview,
   OPERATION_GENERATE_CONTENT,
+  OPERATION_INVOKE_AGENT,
   PROMPT_API_NAME,
   readContextUsage,
   type SessionTelemetryMeta,
@@ -53,11 +55,24 @@ export interface SessionState extends SessionTelemetryMeta {
   tools: Map<string, LanguageModelToolDeclaration>;
   pendingCalls: PendingToolCall[];
   toolCallSeq: number;
-  /**
-   * Context of the turn that opened the current exchange. Turns carrying tool
-   * responses parent to it, so one question and its tool rounds form one trace.
-   */
-  exchangeContext?: Context;
+  /** The exchange in flight, if the current question needed tools. */
+  exchange?: Exchange;
+}
+
+/**
+ * A question being answered with tools, spanning several model turns.
+ *
+ * The turns and tool runs of an exchange are siblings under one `invoke_agent`
+ * span rather than nested inside the first turn: they happen one after another,
+ * and a turn does not run inside the turn before it. That span is also what
+ * carries the exchange's answer, since the final text arrives on the last turn
+ * while a trace is read from its root.
+ */
+export interface Exchange {
+  span: Span;
+  context: Context;
+  turns: number;
+  toolCalls: number;
 }
 
 const overflowRecordedSpans = new WeakSet<Span>();
@@ -321,7 +336,8 @@ function toolCallAttributes(output: string | AssistantTurn): Attributes {
 function captureOutputAttributes(
   attributes: Attributes,
   output: string | AssistantTurn,
-  { finishReason, config }: TurnResult
+  finishReason: string,
+  config: InstrumentationConfig
 ): void {
   attributes[GEN_AI.OUTPUT_MESSAGES] = truncateAttribute(
     JSON.stringify(encodeOutputMessages(output, finishReason)),
@@ -357,7 +373,69 @@ export function resultAttributes(result: TurnResult): Attributes {
 
   Object.assign(attributes, toolCallAttributes(output));
   if (config.captureOutput) {
-    captureOutputAttributes(attributes, output, result);
+    captureOutputAttributes(attributes, output, finishReason, config);
+  }
+
+  return attributes;
+}
+
+export interface ExchangeRequest {
+  state: SessionState;
+  input: unknown;
+  config: InstrumentationConfig;
+  providerName: string;
+}
+
+/** Attributes for the span that opens an exchange, before any turn has run. */
+export function exchangeAttributes(request: ExchangeRequest): Attributes {
+  const { state, input, config, providerName } = request;
+  const attributes: Attributes = {
+    [GEN_AI.OPERATION_NAME]: OPERATION_INVOKE_AGENT,
+    [GEN_AI.PROVIDER_NAME]: providerName,
+    ...promptApiAttributes(state),
+    [WEB_AI.TOOL_COUNT]: state.tools.size,
+    [WEB_AI.TOOL_NAMES]: [...state.tools.keys()],
+  };
+
+  if (config.captureInput) {
+    captureInputAttributes(attributes, {
+      state,
+      input,
+      streaming: false,
+      config,
+      providerName,
+      traffic: { calls: [], responses: [] },
+    });
+  }
+
+  return attributes;
+}
+
+export interface ExchangeResult {
+  exchange: Exchange;
+  /** The turn that ended the exchange, absent if it was abandoned. */
+  output?: string | AssistantTurn;
+  config: InstrumentationConfig;
+}
+
+/** Attributes known only once an exchange is over. */
+export function exchangeResultAttributes(result: ExchangeResult): Attributes {
+  const { exchange, output, config } = result;
+  const attributes: Attributes = {
+    [WEB_AI.EXCHANGE_TURN_COUNT]: exchange.turns,
+    [WEB_AI.EXCHANGE_TOOL_CALL_COUNT]: exchange.toolCalls,
+  };
+
+  if (output === undefined) {
+    attributes[WEB_AI.EXCHANGE_ABANDONED] = true;
+    return attributes;
+  }
+
+  // The answer belongs to the exchange as much as to the turn that produced
+  // it: a trace is summarised from its root.
+  attributes[GEN_AI.FINISH_REASONS] = [FINISH_STOP];
+  if (config.captureOutput) {
+    captureOutputAttributes(attributes, output, FINISH_STOP, config);
   }
 
   return attributes;

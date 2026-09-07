@@ -274,6 +274,10 @@ function traceRow(trace: TraceSummary): HTMLButtonElement {
     trace.statusCode === SPAN_STATUS_ERROR,
     [
       el("div", "name", trace.rootSpanName),
+      trace.request ? el("div", "preview", trace.request) : undefined,
+      trace.response
+        ? el("div", "preview response", trace.response)
+        : undefined,
       el("div", "meta", trace.origin),
       el(
         "div",
