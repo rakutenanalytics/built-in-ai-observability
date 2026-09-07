@@ -20,6 +20,30 @@ type Availability =
   | "downloading"
   | "available";
 
+interface CreateMonitorEventMap {
+  downloadprogress: ProgressEvent;
+}
+
+/**
+ * Watches a model download. Only the members used here are declared, under the
+ * names `@types/dom-chromium-ai` gives them, so adopting the package later is a
+ * deletion rather than a rename.
+ */
+interface CreateMonitor extends EventTarget {
+  addEventListener<K extends keyof CreateMonitorEventMap>(
+    type: K,
+    listener: (this: CreateMonitor, event: CreateMonitorEventMap[K]) => void,
+    options?: boolean | AddEventListenerOptions
+  ): void;
+  addEventListener(
+    type: string,
+    listener: EventListenerOrEventListenerObject,
+    options?: boolean | AddEventListenerOptions
+  ): void;
+}
+
+type CreateMonitorCallback = (monitor: CreateMonitor) => void;
+
 /**
  * Tool traffic is declared like any other modality. `tool-call` and
  * `tool-response` require chrome://flags/#prompt-api-tool-use.
@@ -144,7 +168,7 @@ interface LanguageModelCreateOptions {
   initialPrompts?: LanguageModelMessage[];
   tools?: LanguageModelToolDeclaration[];
   signal?: AbortSignal;
-  monitor?: (m: EventTarget) => void;
+  monitor?: CreateMonitorCallback;
 }
 
 interface LanguageModel extends EventTarget {

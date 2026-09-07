@@ -71,9 +71,9 @@ function withDownloadMonitor(
 
   return {
     ...options,
-    monitor: (monitor: EventTarget) => {
+    monitor: (monitor) => {
       monitor.addEventListener("downloadprogress", (event) => {
-        const { loaded } = event as ProgressEvent;
+        const { loaded } = event;
         firstProgressAt ??= performance.now();
 
         // A model already on disk still reports 0 then 1 back to back, so only
