@@ -171,6 +171,65 @@ describe("devtools trace storage", () => {
     expect(sessions[0].durationMs).toBeCloseTo(2500);
   });
 
+  it("counts the tool calls in a tool exchange", async () => {
+    // One question answered with a tool: two model turns and one tool run, all
+    // in the same trace because the second turn carried the tool response.
+    const spans = [
+      span({
+        name: "generate_content",
+        traceId: "t1",
+        spanId: "s1",
+        startMs: 1000,
+        conversationId: CONVERSATION,
+        attributes: { "gen_ai.operation.name": "generate_content" },
+      }),
+      span({
+        name: "execute_tool get_weather",
+        traceId: "t1",
+        spanId: "s2",
+        startMs: 1010,
+        conversationId: CONVERSATION,
+        attributes: {
+          "gen_ai.operation.name": "execute_tool",
+          "gen_ai.tool.name": "get_weather",
+        },
+      }),
+      span({
+        name: "generate_content",
+        traceId: "t1",
+        spanId: "s3",
+        startMs: 1020,
+        conversationId: CONVERSATION,
+        attributes: { "gen_ai.operation.name": "generate_content" },
+      }),
+    ];
+    for (const record of spans) {
+      await storage.storeSpan(record, TAB_A);
+    }
+
+    const [trace] = await storage.listTraces({});
+    expect(trace).toMatchObject({ spanCount: 3, toolCallCount: 1 });
+
+    const [session] = await storage.listSessions({});
+    expect(session).toMatchObject({ turnCount: 2, toolCallCount: 1 });
+  });
+
+  it("counts no tool calls for a plain turn", async () => {
+    await storage.storeSpan(
+      span({
+        name: "generate_content",
+        traceId: "t1",
+        spanId: "s1",
+        conversationId: CONVERSATION,
+        attributes: { "gen_ai.operation.name": "generate_content" },
+      }),
+      TAB_A
+    );
+
+    const [trace] = await storage.listTraces({});
+    expect(trace.toolCallCount).toBe(0);
+  });
+
   it("counts errors and marks the owning trace as failed", async () => {
     await storage.storeSpan(
       span({

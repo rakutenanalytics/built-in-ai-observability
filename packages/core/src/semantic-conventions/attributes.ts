@@ -11,6 +11,11 @@ export const GEN_AI = {
   FINISH_REASONS: "gen_ai.response.finish_reasons",
   CONVERSATION_ID: "gen_ai.conversation.id",
   CONVERSATION_COMPACTED: "gen_ai.conversation.compacted",
+  TOOL_DEFINITIONS: "gen_ai.tool.definitions",
+  TOOL_NAME: "gen_ai.tool.name",
+  TOOL_DESCRIPTION: "gen_ai.tool.description",
+  TOOL_TYPE: "gen_ai.tool.type",
+  TOOL_CALL_ID: "gen_ai.tool.call.id",
 } as const;
 
 /** Experimental Web AI attributes not covered by standard OTel conventions. */
@@ -37,11 +42,31 @@ export const WEB_AI = {
   SESSION_EXPECTED_OUTPUTS: "web_ai.session.expected_outputs",
   SESSION_ID: "web_ai.session.id",
   SESSION_PARENT_ID: "web_ai.session.parent_id",
+  /** Tools declared on the session. */
+  TOOL_COUNT: "web_ai.tool.count",
+  TOOL_NAMES: "web_ai.tool.names",
+  /**
+   * Tool activity on a turn. Recorded even when content capture is off, so the
+   * shape of an exchange stays visible without its payloads.
+   */
+  TOOL_CALL_COUNT: "web_ai.tool.call_count",
+  TOOL_CALL_NAMES: "web_ai.tool.call_names",
+  TOOL_RESPONSE_COUNT: "web_ai.tool.response_count",
+  /** Chrome leaves `callID` empty, so calls are identified by position. */
+  TOOL_CALL_INDEX: "web_ai.tool.call_index",
+  TOOL_CALL_ARGUMENTS: "web_ai.tool.call_arguments",
+  TOOL_RESULT: "web_ai.tool.result",
+  TOOL_FAILED: "web_ai.tool.failed",
+  /** Set on a turn that carries tool responses, continuing an earlier turn. */
+  TURN_CONTINUATION: "web_ai.conversation.turn_continuation",
 } as const;
 
 export const ERROR_TYPE = "error.type";
 export const SESSION_ID = "session.id";
 
 export const OPERATION_GENERATE_CONTENT = "generate_content";
+export const OPERATION_EXECUTE_TOOL = "execute_tool";
+/** Only kind of tool the Prompt API exposes. */
+export const TOOL_TYPE_FUNCTION = "function";
 export const DEFAULT_PROVIDER_NAME = "google.chrome";
 export const PROMPT_API_NAME = "LanguageModel";

@@ -51,7 +51,7 @@ Aligned with the PoC (OTel JS 2.x):
 | `@opentelemetry/exporter-trace-otlp-http` | ^0.205.0 |
 | `@opentelemetry/semantic-conventions` | ^1.28.0 |
 
-Types: `@types/dom-chromium-ai` in devDependencies where needed.
+Types: ambient declarations in `types/prompt-api.d.ts`. `@types/dom-chromium-ai` was the intended source, but its tool types describe the superseded `execute` callback design; see the file header.
 
 ## 4. Prompt API methods to instrument
 

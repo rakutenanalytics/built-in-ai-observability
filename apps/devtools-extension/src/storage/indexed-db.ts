@@ -4,7 +4,7 @@ import type {
 } from "@web-ai-otel/extension-transport/protocol";
 
 const DB_NAME = "web-ai-otel";
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 const SPANS_STORE = "spans";
 const TRACES_STORE = "traces";
 const SESSIONS_STORE = "sessions";
@@ -25,7 +25,9 @@ const INPUT_MESSAGES = "gen_ai.input.messages";
 const OUTPUT_MESSAGES = "gen_ai.output.messages";
 const CONTEXT_WINDOW = "web_ai.context.window_tokens";
 const CONTEXT_USAGE_AFTER = "web_ai.context.usage_after_tokens";
+const OPERATION_NAME = "gen_ai.operation.name";
 const TURN_SPAN_NAME = "generate_content";
+const EXECUTE_TOOL_OPERATION = "execute_tool";
 
 /** A span plus the attribution the extension derived from the sender. */
 export interface StoredSpan extends SerializedSpan {
@@ -48,6 +50,8 @@ export interface TraceSummary {
   tabId?: number;
   statusCode: number;
   conversationId?: string;
+  /** `execute_tool` spans in the trace, so a tool exchange reads as one. */
+  toolCallCount: number;
 }
 
 /**
@@ -66,6 +70,7 @@ export interface SessionSummary {
   spanCount: number;
   turnCount: number;
   errorCount: number;
+  toolCallCount: number;
   /** First captured user text; absent when content capture is off. */
   request?: string;
   /** Most recent captured assistant text. */
@@ -86,6 +91,18 @@ function stringAttr(span: SerializedSpan, key: string): string | undefined {
 function numberAttr(span: SerializedSpan, key: string): number | undefined {
   const value = span.attributes[key];
   return typeof value === "number" ? value : undefined;
+}
+
+/**
+ * Matched on the operation rather than the span name, since the name carries
+ * the tool as well (`execute_tool get_weather`).
+ */
+function isToolSpan(span: SerializedSpan): boolean {
+  return stringAttr(span, OPERATION_NAME) === EXECUTE_TOOL_OPERATION;
+}
+
+function countOf(condition: boolean): number {
+  return condition ? 1 : 0;
 }
 
 function truncate(text: string): string {
@@ -190,6 +207,7 @@ function mergeTrace(
       tabId: span.source.tabId,
       statusCode: span.status.code,
       conversationId: span.conversationId,
+      toolCallCount: countOf(isToolSpan(span)),
     };
   }
 
@@ -209,6 +227,7 @@ function mergeTrace(
     // SpanStatusCode orders UNSET < OK < ERROR, so this surfaces failures.
     statusCode: Math.max(existing.statusCode, span.status.code),
     conversationId: existing.conversationId ?? span.conversationId,
+    toolCallCount: existing.toolCallCount + countOf(isToolSpan(span)),
   };
 }
 
@@ -227,8 +246,9 @@ function newSession(
     durationMs: span.durationMs,
     traceIds: [span.traceId],
     spanCount: 1,
-    turnCount: span.name === TURN_SPAN_NAME ? 1 : 0,
-    errorCount: span.status.code === SPAN_STATUS_ERROR ? 1 : 0,
+    turnCount: countOf(span.name === TURN_SPAN_NAME),
+    errorCount: countOf(span.status.code === SPAN_STATUS_ERROR),
+    toolCallCount: countOf(isToolSpan(span)),
     request: previewFrom(stringAttr(span, INPUT_MESSAGES)),
     response: previewFrom(stringAttr(span, OUTPUT_MESSAGES)),
     contextWindow: numberAttr(span, CONTEXT_WINDOW),
@@ -259,9 +279,10 @@ function mergeSession(
     durationMs: mergedEnd - startTimeMs,
     traceIds,
     spanCount: existing.spanCount + 1,
-    turnCount: existing.turnCount + (span.name === TURN_SPAN_NAME ? 1 : 0),
+    turnCount: existing.turnCount + countOf(span.name === TURN_SPAN_NAME),
     errorCount:
-      existing.errorCount + (span.status.code === SPAN_STATUS_ERROR ? 1 : 0),
+      existing.errorCount + countOf(span.status.code === SPAN_STATUS_ERROR),
+    toolCallCount: existing.toolCallCount + countOf(isToolSpan(span)),
     // Keep the opening request, but track the latest response.
     request: existing.request ?? previewFrom(stringAttr(span, INPUT_MESSAGES)),
     response:

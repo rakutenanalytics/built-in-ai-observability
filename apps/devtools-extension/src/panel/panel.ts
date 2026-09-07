@@ -37,6 +37,15 @@ function shortId(id: string): string {
   return id.slice(0, SHORT_ID_LENGTH);
 }
 
+function plural(count: number, noun: string): string {
+  return `${count} ${noun}${count === 1 ? "" : "s"}`;
+}
+
+/** Only shown when tools were actually used, so plain turns stay uncluttered. */
+function toolSuffix(count: number): string {
+  return count > 0 ? ` · ${plural(count, "tool call")}` : "";
+}
+
 async function request<T extends PanelRequest["type"]>(
   message: Extract<PanelRequest, { type: T }>
 ): Promise<PanelResponses[T]> {
@@ -158,6 +167,10 @@ async function showTraceDetail(trace: TraceSummary): Promise<void> {
       ["Session", trace.conversationId && shortId(trace.conversationId)],
       ["Origin", trace.origin],
       ["Spans", String(trace.spanCount)],
+      [
+        "Tool calls",
+        trace.toolCallCount > 0 ? String(trace.toolCallCount) : undefined,
+      ],
       ["Duration", formatDuration(trace.durationMs)],
       ["URL", trace.url],
     ]),
@@ -166,9 +179,10 @@ async function showTraceDetail(trace: TraceSummary): Promise<void> {
 }
 
 /**
- * A session view groups every trace sharing a conversation id. Until tool
- * calling lands each operation is its own trace, so spans are grouped by trace
- * here rather than rendered as one tree.
+ * A session view groups every trace sharing a conversation id. A question
+ * answered without tools is a trace of its own, while a tool exchange is one
+ * trace holding several turns, so spans are grouped by trace here rather than
+ * rendered as a single tree.
  */
 async function showSessionDetail(session: SessionSummary): Promise<void> {
   const target = detailEl();
@@ -196,6 +210,10 @@ async function showSessionDetail(session: SessionSummary): Promise<void> {
       ["Turns", String(session.turnCount)],
       ["Traces", String(session.traceIds.length)],
       ["Spans", String(session.spanCount)],
+      [
+        "Tool calls",
+        session.toolCallCount > 0 ? String(session.toolCallCount) : undefined,
+      ],
       ["Errors", session.errorCount ? String(session.errorCount) : undefined],
       ["Duration", formatDuration(session.durationMs)],
       ["Context", context],
@@ -260,7 +278,7 @@ function traceRow(trace: TraceSummary): HTMLButtonElement {
       el(
         "div",
         "meta",
-        `${formatTime(trace.startTimeMs)} · ${formatDuration(trace.durationMs)} · ${trace.spanCount} span${trace.spanCount === 1 ? "" : "s"}`
+        `${formatTime(trace.startTimeMs)} · ${formatDuration(trace.durationMs)} · ${plural(trace.spanCount, "span")}${toolSuffix(trace.toolCallCount)}`
       ),
     ],
     () => {
@@ -270,7 +288,7 @@ function traceRow(trace: TraceSummary): HTMLButtonElement {
 }
 
 function sessionRow(session: SessionSummary): HTMLButtonElement {
-  const turns = `${session.turnCount} turn${session.turnCount === 1 ? "" : "s"}`;
+  const turns = plural(session.turnCount, "turn");
   return listItem(
     session.conversationId,
     session.errorCount > 0,
@@ -284,7 +302,7 @@ function sessionRow(session: SessionSummary): HTMLButtonElement {
       el(
         "div",
         "meta",
-        `${formatTime(session.startTimeMs)} · ${formatDuration(session.durationMs)} · ${turns}`
+        `${formatTime(session.startTimeMs)} · ${formatDuration(session.durationMs)} · ${turns}${toolSuffix(session.toolCallCount)}`
       ),
     ],
     () => {

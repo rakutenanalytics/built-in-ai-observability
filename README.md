@@ -190,7 +190,16 @@ pnpm format     # auto-fix lint and formatting
 
 Lint rules come from [Ultracite](https://github.com/haydenbleasel/ultracite) via `biome.jsonc`, but the scripts call Biome directly because `ultracite check` currently fails to render diagnostics.
 
-Ambient Prompt API types live in `types/prompt-api.d.ts` and are shared by every package that needs them, rather than relying on `@types/dom-chromium-ai` (which still describes the older `ai.languageModel` shape).
+Ambient Prompt API types live in `types/prompt-api.d.ts` and are shared by every package that needs them, rather than relying on `@types/dom-chromium-ai`. That package is the better long-term home, and covers the task APIs we have not instrumented yet, but its tool types still describe the design where a tool carries an `execute` callback for the browser to invoke. See the file header for why the two cannot be mixed, and switch as soon as the package catches up.
+
+### Working around a moving API
+
+Tool use is still changing in Chrome, so a few things here exist only to cope with today's behaviour and should be deleted once it settles:
+
+- Tool objects keep every field on the prototype, so `Object.keys()` sees nothing and `JSON.stringify()` yields `{}`. `packages/core/src/attributes/tools.ts` reads each field by name instead.
+- `callID` comes back as an empty string, even for several calls in one turn, so responses are paired with calls by tool name and request order (`takePendingCall` in `packages/instrumentation-prompt-api/src/tool-spans.ts`).
+- Chrome rejects a tool result containing a JSON `null` at any depth, which the playground strips in `apps/playground/tools.ts`.
+- An `execute_tool` span is reconstructed from the outside, because the tool runs in page code the instrumentation never sees.
 
 ## Relationship to the PoC
 

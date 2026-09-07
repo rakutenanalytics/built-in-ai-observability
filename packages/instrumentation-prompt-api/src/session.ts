@@ -1,5 +1,6 @@
-import type { Attributes, Span } from "@opentelemetry/api";
+import type { Attributes, Context, Span } from "@opentelemetry/api";
 import {
+  type AssistantTurn,
   contextAttributes,
   encodeInputMessages,
   encodeOutputMessages,
@@ -12,6 +13,9 @@ import {
   readContextUsage,
   type SessionTelemetryMeta,
   sessionAttributes,
+  TOOL_TYPE_FUNCTION,
+  type ToolCallInfo,
+  type ToolTraffic,
   textFromGenAiMessages,
   textFromSystemInstructions,
   truncateAttribute,
@@ -20,6 +24,21 @@ import {
 
 const MLFLOW_INPUTS = "mlflow.spanInputs";
 const MLFLOW_OUTPUTS = "mlflow.spanOutputs";
+
+/**
+ * A call the model asked for and the page has not answered yet. The tool runs
+ * in page code, out of reach of this instrumentation, so the only way to time
+ * it is to remember when the page could first run it and wait for its response.
+ */
+export interface PendingToolCall extends ToolCallInfo {
+  /** Stands in for `callID`, which Chrome leaves empty. */
+  index: number;
+  turnIndex: number;
+  /** Epoch ms of the turn that asked for it, so the tool span can be backdated. */
+  runnableAt: number;
+  /** Context of the turn that asked for the call. */
+  parent: Context;
+}
 
 export interface SessionState extends SessionTelemetryMeta {
   turnIndex: number;
@@ -30,6 +49,15 @@ export interface SessionState extends SessionTelemetryMeta {
    * next turn can carry it. Cleared once attributed.
    */
   pendingOverflow: boolean;
+  /** Declared tools by name, so a tool span can carry its description. */
+  tools: Map<string, LanguageModelToolDeclaration>;
+  pendingCalls: PendingToolCall[];
+  toolCallSeq: number;
+  /**
+   * Context of the turn that opened the current exchange. Turns carrying tool
+   * responses parent to it, so one question and its tool rounds form one trace.
+   */
+  exchangeContext?: Context;
 }
 
 const overflowRecordedSpans = new WeakSet<Span>();
@@ -42,14 +70,79 @@ export function promptApiAttributes(state: SessionTelemetryMeta): Attributes {
   };
 }
 
-export function createSessionState(meta: SessionTelemetryMeta): SessionState {
+export function createSessionState(
+  meta: SessionTelemetryMeta,
+  tools: LanguageModelToolDeclaration[] = []
+): SessionState {
   return {
     ...meta,
     turnIndex: 0,
     compacted: false,
     activeSpans: new Set(),
     pendingOverflow: false,
+    tools: new Map(tools.map((tool) => [tool.name, tool])),
+    pendingCalls: [],
+    toolCallSeq: 0,
   };
+}
+
+function toolDeclarationAttributes(
+  tools: LanguageModelToolDeclaration[],
+  config: InstrumentationConfig
+): Attributes {
+  const attributes: Attributes = {
+    [WEB_AI.TOOL_COUNT]: tools.length,
+    [WEB_AI.TOOL_NAMES]: tools.map((tool) => tool.name),
+  };
+
+  // Declarations are app-authored rather than user content, but they are part
+  // of what the model is prompted with, so they follow the input setting.
+  if (config.captureInput) {
+    attributes[GEN_AI.TOOL_DEFINITIONS] = truncateAttribute(
+      JSON.stringify(
+        tools.map(({ name, description, inputSchema }) => ({
+          type: TOOL_TYPE_FUNCTION,
+          name,
+          description,
+          parameters: inputSchema,
+        }))
+      ),
+      config.maxAttributeLength
+    );
+  }
+
+  return attributes;
+}
+
+function systemInstructionAttributes(
+  initialPrompts: LanguageModelMessage[],
+  config: InstrumentationConfig
+): Attributes {
+  const instructions = encodeSystemInstructions(
+    initialPrompts as Array<{
+      role?: string;
+      content:
+        | string
+        | Array<{ type: string; value?: unknown; content?: string }>;
+    }>
+  );
+  if (!instructions) {
+    return {};
+  }
+
+  const attributes: Attributes = {
+    [GEN_AI.SYSTEM_INSTRUCTIONS]: truncateAttribute(
+      JSON.stringify(instructions),
+      config.maxAttributeLength
+    ),
+  };
+  const text = config.includeMlflowPreview
+    ? textFromSystemInstructions(instructions)
+    : "";
+  if (text) {
+    attributes[MLFLOW_INPUTS] = mlflowChatPreview("system", text);
+  }
+  return attributes;
 }
 
 export function createSessionAttributes(
@@ -57,6 +150,10 @@ export function createSessionAttributes(
   config: InstrumentationConfig
 ): Attributes {
   const attributes: Attributes = {};
+
+  if (options.tools?.length) {
+    Object.assign(attributes, toolDeclarationAttributes(options.tools, config));
+  }
 
   if (options.expectedInputs?.length) {
     attributes[WEB_AI.SESSION_EXPECTED_INPUTS] = JSON.stringify(
@@ -73,27 +170,10 @@ export function createSessionAttributes(
   }
 
   if (config.captureInput && options.initialPrompts?.length) {
-    const instructions = encodeSystemInstructions(
-      options.initialPrompts as Array<{
-        role?: string;
-        content:
-          | string
-          | Array<{ type: string; value?: unknown; content?: string }>;
-      }>
+    Object.assign(
+      attributes,
+      systemInstructionAttributes(options.initialPrompts, config)
     );
-    if (instructions) {
-      const json = truncateAttribute(
-        JSON.stringify(instructions),
-        config.maxAttributeLength
-      );
-      attributes[GEN_AI.SYSTEM_INSTRUCTIONS] = json;
-      if (config.includeMlflowPreview) {
-        const text = textFromSystemInstructions(instructions);
-        if (text) {
-          attributes[MLFLOW_INPUTS] = mlflowChatPreview("system", text);
-        }
-      }
-    }
   }
 
   return attributes;
@@ -148,14 +228,43 @@ export function reconcileContextOverflow(
   recordContextOverflow(span, before, after);
 }
 
-export function requestAttributes(
-  state: SessionState,
-  input: unknown,
-  opts: LanguageModelPromptOptions | undefined,
-  streaming: boolean,
-  config: InstrumentationConfig,
-  providerName: string
-): Attributes {
+export interface TurnRequest {
+  state: SessionState;
+  input: unknown;
+  options?: LanguageModelPromptOptions;
+  streaming: boolean;
+  config: InstrumentationConfig;
+  providerName: string;
+  traffic: ToolTraffic;
+}
+
+function captureInputAttributes(
+  attributes: Attributes,
+  { input, config }: TurnRequest
+): void {
+  const inputMessages = encodeInputMessages(input as LanguageModelPrompt);
+  attributes[GEN_AI.INPUT_MESSAGES] = truncateAttribute(
+    JSON.stringify(inputMessages),
+    config.maxAttributeLength
+  );
+  if (!config.includeMlflowPreview) {
+    return;
+  }
+  const previewText =
+    typeof input === "string"
+      ? input
+      : textFromGenAiMessages(
+          inputMessages as unknown as Array<{
+            parts?: Array<{ type: string; content?: string }>;
+          }>
+        );
+  if (previewText) {
+    attributes[MLFLOW_INPUTS] = mlflowChatPreview("user", previewText);
+  }
+}
+
+export function requestAttributes(request: TurnRequest): Attributes {
+  const { state, options, streaming, config, providerName, traffic } = request;
   state.turnIndex += 1;
 
   const attributes: Attributes = {
@@ -168,50 +277,70 @@ export function requestAttributes(
   if (streaming) {
     attributes[GEN_AI.REQUEST_STREAM] = true;
   }
-  if (opts?.responseConstraint) {
+  if (options?.responseConstraint) {
     attributes[GEN_AI.OUTPUT_TYPE] = "json";
   }
   if (state.compacted) {
     attributes[GEN_AI.CONVERSATION_COMPACTED] = true;
   }
+  // Tool responses in the input mean the page is answering the previous turn.
+  if (traffic.responses.length > 0) {
+    attributes[WEB_AI.TURN_CONTINUATION] = true;
+    attributes[WEB_AI.TOOL_RESPONSE_COUNT] = traffic.responses.length;
+  }
 
   if (config.captureInput) {
-    const inputMessages = encodeInputMessages(input as LanguageModelPrompt);
-    attributes[GEN_AI.INPUT_MESSAGES] = truncateAttribute(
-      JSON.stringify(inputMessages),
-      config.maxAttributeLength
-    );
-    if (config.includeMlflowPreview) {
-      const previewText =
-        typeof input === "string"
-          ? input
-          : textFromGenAiMessages(
-              inputMessages as unknown as Array<{
-                parts?: Array<{ type: string; content?: string }>;
-              }>
-            );
-      if (previewText) {
-        attributes[MLFLOW_INPUTS] = mlflowChatPreview("user", previewText);
-      }
-    }
+    captureInputAttributes(attributes, request);
   }
 
   return attributes;
 }
 
-export function resultAttributes(
-  session: LanguageModel,
-  state: SessionState,
-  windowTokens: number | undefined,
-  before: number | undefined,
-  text: string | undefined,
-  finish: string,
-  config: InstrumentationConfig,
-  after = readContextUsage(session)
-): Attributes {
+export interface TurnResult {
+  session: LanguageModel;
+  state: SessionState;
+  windowTokens?: number;
+  before?: number;
+  output?: string | AssistantTurn;
+  finishReason: string;
+  config: InstrumentationConfig;
+  after?: number;
+}
+
+/** Names of the tools a turn asked for, recorded whatever the capture config. */
+function toolCallAttributes(output: string | AssistantTurn): Attributes {
+  if (typeof output === "string" || output.toolCalls.length === 0) {
+    return {};
+  }
+  return {
+    [WEB_AI.TOOL_CALL_COUNT]: output.toolCalls.length,
+    [WEB_AI.TOOL_CALL_NAMES]: output.toolCalls.map((call) => call.name),
+  };
+}
+
+function captureOutputAttributes(
+  attributes: Attributes,
+  output: string | AssistantTurn,
+  { finishReason, config }: TurnResult
+): void {
+  attributes[GEN_AI.OUTPUT_MESSAGES] = truncateAttribute(
+    JSON.stringify(encodeOutputMessages(output, finishReason)),
+    config.maxAttributeLength
+  );
+  const text = typeof output === "string" ? output : output.text;
+  if (config.includeMlflowPreview && text) {
+    attributes[MLFLOW_OUTPUTS] = mlflowChatPreview("assistant", text);
+  }
+}
+
+export function resultAttributes(result: TurnResult): Attributes {
+  const { session, state, windowTokens, before, output, finishReason, config } =
+    result;
+  const after = result.after ?? readContextUsage(session);
+
   const attributes: Attributes = {
     ...contextAttributes(windowTokens, before, after),
-    [GEN_AI.FINISH_REASONS]: [finish],
+    [GEN_AI.FINISH_REASONS]: [finishReason],
   };
 
   if (state.compacted) {
@@ -222,14 +351,13 @@ export function resultAttributes(
     attributes[GEN_AI.CONVERSATION_COMPACTED] = true;
   }
 
-  if (config.captureOutput && text !== undefined) {
-    attributes[GEN_AI.OUTPUT_MESSAGES] = truncateAttribute(
-      JSON.stringify(encodeOutputMessages(text, finish)),
-      config.maxAttributeLength
-    );
-    if (config.includeMlflowPreview) {
-      attributes[MLFLOW_OUTPUTS] = mlflowChatPreview("assistant", text);
-    }
+  if (output === undefined) {
+    return attributes;
+  }
+
+  Object.assign(attributes, toolCallAttributes(output));
+  if (config.captureOutput) {
+    captureOutputAttributes(attributes, output, result);
   }
 
   return attributes;

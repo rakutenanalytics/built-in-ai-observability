@@ -16,8 +16,10 @@ const SPAN_STATUS_ERROR = 2;
 
 type MockSessionOverrides = Record<string, unknown>;
 
-function streamOf(chunks: string[]): ReadableStream<string> {
-  return new ReadableStream<string>({
+function streamOf(
+  chunks: LanguageModelStreamChunk[]
+): ReadableStream<LanguageModelStreamChunk> {
+  return new ReadableStream<LanguageModelStreamChunk>({
     start(controller) {
       for (const chunk of chunks) {
         controller.enqueue(chunk);
@@ -26,6 +28,104 @@ function streamOf(chunks: string[]): ReadableStream<string> {
     },
   });
 }
+
+/** A stream that pauses mid-turn, the way a model that keeps generating does. */
+function slowStream(
+  before: LanguageModelStreamChunk[],
+  pauseMs: number,
+  after: LanguageModelStreamChunk[]
+): ReadableStream<LanguageModelStreamChunk> {
+  return new ReadableStream<LanguageModelStreamChunk>({
+    async start(controller) {
+      for (const chunk of before) {
+        controller.enqueue(chunk);
+      }
+      await new Promise((resolve) => setTimeout(resolve, pauseMs));
+      for (const chunk of after) {
+        controller.enqueue(chunk);
+      }
+      controller.close();
+    },
+  });
+}
+
+const NANOS_PER_MS = 1e6;
+const MS_PER_SECOND = 1000;
+
+function durationMs(span: ReadableSpan | undefined): number {
+  const [seconds, nanos] = span?.duration ?? [0, 0];
+  return seconds * MS_PER_SECOND + nanos / NANOS_PER_MS;
+}
+
+/**
+ * The real tool interfaces keep every field on the prototype, so `Object.keys()`
+ * sees nothing. These doubles do the same, which is what the encoders have to
+ * cope with.
+ */
+function toolCall(
+  name: string,
+  args: Record<string, unknown>,
+  callID = ""
+): LanguageModelToolCall {
+  return Object.create({
+    callID,
+    name,
+    arguments: args,
+  }) as LanguageModelToolCall;
+}
+
+function toolSuccess(
+  name: string,
+  value: unknown,
+  callID = ""
+): LanguageModelToolSuccess {
+  return Object.create({
+    callID,
+    name,
+    result: [{ type: "object", value }],
+  }) as LanguageModelToolSuccess;
+}
+
+function toolError(
+  name: string,
+  errorMessage: string,
+  callID = ""
+): LanguageModelToolError {
+  return Object.create({
+    callID,
+    name,
+    errorMessage,
+  }) as LanguageModelToolError;
+}
+
+function toolCallChunk(
+  call: LanguageModelToolCall
+): LanguageModelToolCallContent {
+  return { type: "tool-call", value: call };
+}
+
+function toolResponseChunk(
+  response: LanguageModelToolResponse
+): LanguageModelToolResponseContent {
+  return { type: "tool-response", value: response };
+}
+
+function toolResponseTurn(
+  ...responses: LanguageModelToolResponse[]
+): LanguageModelMessage[] {
+  // Tool responses travel as user content: there is no `tool` role.
+  return [{ role: "user", content: responses.map(toolResponseChunk) }];
+}
+
+const WEATHER_TOOL: LanguageModelToolDeclaration = {
+  name: "get_weather",
+  description: "Get the current weather for a city.",
+  inputSchema: {
+    type: "object",
+    properties: { city: { type: "string" } },
+    required: ["city"],
+  },
+};
 
 function createMockSession(overrides: MockSessionOverrides = {}) {
   const listeners = new Map<string, Set<() => void>>();
@@ -43,8 +143,14 @@ function createMockSession(overrides: MockSessionOverrides = {}) {
         fn();
       }
     },
-    prompt: vi.fn((input: string) => Promise.resolve(`reply:${input}`)),
-    promptStreaming: vi.fn((input: string) => streamOf(["stream:", input])),
+    prompt: vi.fn(
+      (input: LanguageModelPrompt): Promise<LanguageModelOutput> =>
+        Promise.resolve(`reply:${String(input)}`)
+    ),
+    promptStreaming: vi.fn(
+      (input: LanguageModelPrompt): ReadableStream<LanguageModelStreamChunk> =>
+        streamOf(["stream:", String(input)])
+    ),
     destroy: vi.fn(),
     clone: vi.fn(() => Promise.resolve(createMockSession())),
     ...overrides,
@@ -52,15 +158,24 @@ function createMockSession(overrides: MockSessionOverrides = {}) {
   return session;
 }
 
-async function drain(stream: ReadableStream<string>): Promise<string> {
+async function collect(
+  stream: ReadableStream<LanguageModelStreamChunk>
+): Promise<LanguageModelStreamChunk[]> {
   const reader = stream.getReader();
-  let text = "";
+  const chunks: LanguageModelStreamChunk[] = [];
   let chunk = await reader.read();
   while (!chunk.done) {
-    text += chunk.value;
+    chunks.push(chunk.value);
     chunk = await reader.read();
   }
-  return text;
+  return chunks;
+}
+
+async function drain(
+  stream: ReadableStream<LanguageModelStreamChunk>
+): Promise<string> {
+  const chunks = await collect(stream);
+  return chunks.filter((chunk) => typeof chunk === "string").join("");
 }
 
 describe("PromptApiInstrumentation", () => {
@@ -363,5 +478,271 @@ describe("PromptApiInstrumentation", () => {
     const patched = LanguageModel.create;
     instrumentation.enable();
     expect(LanguageModel.create).toBe(patched);
+  });
+
+  describe("tool calling", () => {
+    const toolSpans = () =>
+      exporter
+        .getFinishedSpans()
+        .filter((span) => span.name.startsWith("execute_tool"));
+
+    const turnSpans = () =>
+      exporter
+        .getFinishedSpans()
+        .filter((span) => span.name === "generate_content");
+
+    it("records declared tools on the create span", async () => {
+      await LanguageModel.create({ tools: [WEATHER_TOOL] });
+
+      const span = spanNamed("web_ai.create_session");
+      expect(span?.attributes["web_ai.tool.count"]).toBe(1);
+      expect(span?.attributes["web_ai.tool.names"]).toEqual(["get_weather"]);
+      expect(String(span?.attributes["gen_ai.tool.definitions"])).toContain(
+        WEATHER_TOOL.description
+      );
+    });
+
+    it("records a tool call that prompt returns instead of text", async () => {
+      mockSession.prompt = vi.fn(() =>
+        Promise.resolve([
+          toolCallChunk(toolCall("get_weather", { city: "Tokyo" })),
+        ])
+      );
+      const session = await LanguageModel.create({ tools: [WEATHER_TOOL] });
+      await session.prompt("weather in Tokyo?");
+
+      const span = spanNamed("generate_content");
+      expect(span?.attributes["web_ai.tool.call_count"]).toBe(1);
+      expect(span?.attributes["web_ai.tool.call_names"]).toEqual([
+        "get_weather",
+      ]);
+      expect(span?.attributes["gen_ai.response.finish_reasons"]).toEqual([
+        "tool_call",
+      ]);
+
+      const output = String(span?.attributes["gen_ai.output.messages"]);
+      expect(output).toContain("tool_call");
+      expect(output).toContain("Tokyo");
+      // The fields live on the prototype, so a naive encode would emit `{}`.
+      expect(output).not.toContain("{}");
+    });
+
+    it("times the tool run and keeps the exchange in one trace", async () => {
+      mockSession.prompt = vi
+        .fn()
+        .mockResolvedValueOnce([
+          toolCallChunk(toolCall("get_weather", { city: "Nara" })),
+        ])
+        .mockResolvedValueOnce("It is clear in Nara.");
+
+      const session = await LanguageModel.create({ tools: [WEATHER_TOOL] });
+      await session.prompt("weather in Nara?");
+      await session.prompt(
+        toolResponseTurn(toolSuccess("get_weather", { tempC: 24 }))
+      );
+
+      const [first, second] = turnSpans();
+      const [toolSpan] = toolSpans();
+
+      expect(toolSpan?.name).toBe("execute_tool get_weather");
+      expect(toolSpan?.attributes["gen_ai.operation.name"]).toBe(
+        "execute_tool"
+      );
+      expect(toolSpan?.attributes["gen_ai.tool.type"]).toBe("function");
+      expect(toolSpan?.attributes["gen_ai.tool.description"]).toBe(
+        WEATHER_TOOL.description
+      );
+      expect(toolSpan?.attributes["web_ai.tool.call_index"]).toBe(1);
+      expect(String(toolSpan?.attributes["web_ai.tool.result"])).toContain(
+        "24"
+      );
+
+      // One question and its tool round form one trace: the continuation turn
+      // and the tool span both hang off the turn that asked for the call.
+      const traceId = first?.spanContext().traceId;
+      const rootSpanId = first?.spanContext().spanId;
+      expect(second?.spanContext().traceId).toBe(traceId);
+      expect(toolSpan?.spanContext().traceId).toBe(traceId);
+      expect(second?.parentSpanContext?.spanId).toBe(rootSpanId);
+      expect(toolSpan?.parentSpanContext?.spanId).toBe(rootSpanId);
+
+      expect(second?.attributes["web_ai.conversation.turn_continuation"]).toBe(
+        true
+      );
+      expect(second?.attributes["web_ai.tool.response_count"]).toBe(1);
+    });
+
+    it("does not charge a tool for the generation that followed its call", async () => {
+      // The model asks for the tool early, then keeps generating. The page
+      // cannot run anything until the stream closes, so that tail belongs to
+      // generate_content, not to the tool.
+      const generationTailMs = 60;
+      mockSession.promptStreaming = vi.fn(() =>
+        slowStream(
+          [toolCallChunk(toolCall("get_weather", { city: "Osaka" }))],
+          generationTailMs,
+          ["thinking about it"]
+        )
+      );
+
+      const session = await LanguageModel.create({ tools: [WEATHER_TOOL] });
+      await drain(session.promptStreaming("weather in Osaka?"));
+      await session.prompt(
+        toolResponseTurn(toolSuccess("get_weather", { tempC: 24 }))
+      );
+
+      const [turn] = turnSpans();
+      const [toolSpan] = toolSpans();
+
+      expect(durationMs(turn)).toBeGreaterThanOrEqual(generationTailMs);
+      expect(durationMs(toolSpan)).toBeLessThan(generationTailMs);
+    });
+
+    it("starts a new trace for a question that carries no tool responses", async () => {
+      const session = await LanguageModel.create();
+      await session.prompt("one");
+      await session.prompt("two");
+
+      const [first, second] = turnSpans();
+      expect(second?.spanContext().traceId).not.toBe(
+        first?.spanContext().traceId
+      );
+      expect(
+        second?.attributes["web_ai.conversation.turn_continuation"]
+      ).toBeUndefined();
+    });
+
+    it("forwards tool-call chunks untouched while streaming", async () => {
+      const call = toolCall("get_weather", { city: "Kyoto" });
+      mockSession.promptStreaming = vi.fn(() =>
+        streamOf(["Checking… ", toolCallChunk(call)])
+      );
+      const session = await LanguageModel.create({ tools: [WEATHER_TOOL] });
+      const chunks = await collect(session.promptStreaming("weather?"));
+
+      // The page runs the tool loop, so it needs the original object.
+      expect(chunks[0]).toBe("Checking… ");
+      expect((chunks[1] as LanguageModelToolCallContent).value).toBe(call);
+
+      const span = spanNamed("generate_content");
+      expect(span?.attributes["web_ai.stream.chunk_count"]).toBe(2);
+      expect(span?.attributes["web_ai.tool.call_count"]).toBe(1);
+
+      const output = String(span?.attributes["gen_ai.output.messages"]);
+      expect(output).toContain("Checking… ");
+      // A tool call concatenated as text would land here as "[object Object]".
+      expect(output).not.toContain("[object Object]");
+    });
+
+    it("pairs parallel calls with their responses by name", async () => {
+      mockSession.prompt = vi
+        .fn()
+        .mockResolvedValueOnce([
+          toolCallChunk(toolCall("get_weather", { city: "Kyoto" })),
+          toolCallChunk(toolCall("get_population", { city: "Kyoto" })),
+        ])
+        .mockResolvedValueOnce("Kyoto is clear, with 1.4M people.");
+
+      const session = await LanguageModel.create({ tools: [WEATHER_TOOL] });
+      await session.prompt("weather and population of Kyoto?");
+      await session.prompt(
+        toolResponseTurn(
+          toolSuccess("get_population", { people: 1_400_000 }),
+          toolSuccess("get_weather", { tempC: 22 })
+        )
+      );
+
+      const spans = toolSpans();
+      expect(spans).toHaveLength(2);
+      // Both callIDs are empty and the answers came back in the opposite order,
+      // so only the name can pair them up.
+      expect(spans.map((span) => span.attributes["gen_ai.tool.name"])).toEqual([
+        "get_population",
+        "get_weather",
+      ]);
+      expect(
+        spans.map((span) => span.attributes["web_ai.tool.call_index"])
+      ).toEqual([2, 1]);
+    });
+
+    it("marks a failed tool with an error status", async () => {
+      mockSession.prompt = vi
+        .fn()
+        .mockResolvedValueOnce([toolCallChunk(toolCall("get_weather", {}))])
+        .mockResolvedValueOnce("I could not look that up.");
+
+      const session = await LanguageModel.create({ tools: [WEATHER_TOOL] });
+      await session.prompt("weather?");
+      await session.prompt(
+        toolResponseTurn(toolError("get_weather", 'missing "city"'))
+      );
+
+      const [toolSpan] = toolSpans();
+      expect(toolSpan?.status.code).toBe(SPAN_STATUS_ERROR);
+      expect(toolSpan?.status.message).toBe('missing "city"');
+      expect(toolSpan?.attributes["web_ai.tool.failed"]).toBe(true);
+      expect(toolSpan?.attributes["error.type"]).toBe("ToolError");
+    });
+
+    it("keeps tool payloads out of spans when capture is off", async () => {
+      instrumentation.disable();
+      exporter.reset();
+      setup({ captureInput: false, captureOutput: false });
+
+      mockSession.prompt = vi
+        .fn()
+        .mockResolvedValueOnce([
+          toolCallChunk(toolCall("get_weather", { city: "Osaka" })),
+        ])
+        .mockResolvedValueOnce("done");
+
+      const session = await LanguageModel.create({ tools: [WEATHER_TOOL] });
+      await session.prompt("weather?");
+      await session.prompt(
+        toolResponseTurn(toolSuccess("get_weather", { tempC: 31 }))
+      );
+
+      const turn = spanNamed("generate_content");
+      const [toolSpan] = toolSpans();
+
+      // The shape of the exchange stays visible; the payloads do not.
+      expect(turn?.attributes["web_ai.tool.call_names"]).toEqual([
+        "get_weather",
+      ]);
+      expect(turn?.attributes["gen_ai.output.messages"]).toBeUndefined();
+      expect(toolSpan?.attributes["gen_ai.tool.name"]).toBe("get_weather");
+      expect(
+        toolSpan?.attributes["web_ai.tool.call_arguments"]
+      ).toBeUndefined();
+      expect(toolSpan?.attributes["web_ai.tool.result"]).toBeUndefined();
+      expect(
+        spanNamed("web_ai.create_session")?.attributes[
+          "gen_ai.tool.definitions"
+        ]
+      ).toBeUndefined();
+    });
+
+    it("groups tool spans into the conversation", async () => {
+      mockSession.prompt = vi
+        .fn()
+        .mockResolvedValueOnce([
+          toolCallChunk(toolCall("get_weather", { city: "Kobe" })),
+        ])
+        .mockResolvedValueOnce("Clear in Kobe.");
+
+      const session = await LanguageModel.create({ tools: [WEATHER_TOOL] });
+      await session.prompt("weather in Kobe?");
+      await session.prompt(
+        toolResponseTurn(toolSuccess("get_weather", { tempC: 26 }))
+      );
+
+      const [toolSpan] = toolSpans();
+      const [turn] = turnSpans();
+      // Needed by the sessions view, which groups on the conversation id.
+      expect(toolSpan?.attributes["gen_ai.conversation.id"]).toBe(
+        turn?.attributes["gen_ai.conversation.id"]
+      );
+      expect(toolSpan?.attributes["web_ai.api.name"]).toBe("LanguageModel");
+    });
   });
 });

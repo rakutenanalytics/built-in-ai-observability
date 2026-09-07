@@ -9,6 +9,18 @@ import {
 } from "@web-ai-otel/core";
 import { PromptApiInstrumentation } from "@web-ai-otel/instrumentation-prompt-api";
 
+/**
+ * Re-exported because tool use changed what a turn resolves to: `prompt()`
+ * answers with a content sequence rather than a string as soon as the model
+ * asks for a tool, and every caller now has to split the two apart.
+ */
+export {
+  type AssistantTurn,
+  readAssistantTurn,
+  type ToolCallInfo,
+  type ToolResponseInfo,
+} from "@web-ai-otel/core";
+
 const DEFAULT_OTLP_URL = "http://localhost:4318/v1/traces";
 
 export interface WebAISDKOptions extends Partial<InstrumentationConfig> {

@@ -1,4 +1,5 @@
 import {
+  type Context,
   context,
   type Span,
   SpanKind,
@@ -13,8 +14,13 @@ import {
   GEN_AI,
   type InstrumentationConfig,
   PROMPT_API_NAME,
+  readAssistantTurn,
   readContextUsage,
   readContextWindow,
+  type ToolCallInfo,
+  type ToolTraffic,
+  toolCallFromChunk,
+  toolTrafficFrom,
   WEB_AI,
 } from "@web-ai-otel/core";
 import {
@@ -27,10 +33,14 @@ import {
   resultAttributes,
   type SessionState,
 } from "./session.js";
+import { emitToolExecutionSpans, registerToolCalls } from "./tool-spans.js";
 
 const MS_PER_SECOND = 1000;
 const DOWNLOAD_COMPLETE = 1;
 const DOWNLOAD_NONE = 0;
+
+const FINISH_STOP = "stop";
+const FINISH_TOOL_CALL = "tool_call";
 
 function finishReasonFor(err: unknown): string {
   return err instanceof Error && err.name === "AbortError" ? "abort" : "error";
@@ -100,139 +110,207 @@ export function wrapSession(
 ): LanguageModel {
   attachOverflowListeners(session, state);
 
+  /**
+   * Opens a turn and decides where it hangs in the trace. A turn carrying tool
+   * responses continues the exchange already in flight, so the whole
+   * question-tools-answer sequence lands in one trace; anything else starts a
+   * new exchange.
+   */
+  const beginTurn = (input: LanguageModelPrompt) => {
+    const traffic = toolTrafficFrom(input);
+    const continuation = traffic.responses.length > 0;
+    const parent =
+      continuation && state.exchangeContext
+        ? state.exchangeContext
+        : context.active();
+
+    // Emitted before the turn opens, so each tool span sits under the turn that
+    // asked for it rather than the one being told the results.
+    if (continuation) {
+      emitToolExecutionSpans({
+        tracer,
+        state,
+        responses: traffic.responses,
+        config,
+        providerName,
+        fallbackParent: parent,
+      });
+    }
+
+    return { traffic, continuation, parent };
+  };
+
+  /** Makes the turn active, and roots the exchange on its opening turn. */
+  const activate = (
+    parent: Context,
+    span: Span,
+    continuation: boolean
+  ): Context => {
+    const spanContext = trace.setSpan(parent, span);
+    if (!(continuation && state.exchangeContext)) {
+      state.exchangeContext = spanContext;
+    }
+    state.activeSpans.add(span);
+    return spanContext;
+  };
+
+  const startTurn = (
+    input: LanguageModelPrompt,
+    opts: LanguageModelPromptOptions | undefined,
+    streaming: boolean,
+    traffic: ToolTraffic
+  ) =>
+    requestAttributes({
+      state,
+      input,
+      options: opts,
+      streaming,
+      config,
+      providerName,
+      traffic,
+    });
+
   const tracedPrompt = (
     input: LanguageModelPrompt,
     opts?: LanguageModelPromptOptions
-  ) => {
+  ): Promise<LanguageModelOutput> => {
+    const { traffic, continuation, parent } = beginTurn(input);
     const windowTokens = readContextWindow(session);
     const before = readContextUsage(session);
-    const attributes = requestAttributes(
-      state,
-      input,
-      opts,
-      false,
-      config,
-      providerName
-    );
 
-    return tracer.startActiveSpan(
+    const span = tracer.startSpan(
       "generate_content",
-      { kind: SpanKind.INTERNAL, attributes },
-      async (span) => {
-        state.activeSpans.add(span);
-        try {
-          const text = await session.prompt(input, opts);
-          const after = readContextUsage(session);
-          reconcileContextOverflow(span, state, before, after);
-          span.setAttributes(
-            resultAttributes(
-              session,
-              state,
-              windowTokens,
-              before,
-              text,
-              "stop",
-              config,
-              after
-            )
-          );
-          span.setStatus({ code: SpanStatusCode.OK });
-          return text;
-        } catch (err) {
-          const after = readContextUsage(session);
-          reconcileContextOverflow(span, state, before, after);
-          span.setAttributes(
-            resultAttributes(
-              session,
-              state,
-              windowTokens,
-              before,
-              undefined,
-              finishReasonFor(err),
-              config,
-              after
-            )
-          );
-          recordError(span, err);
-          throw err;
-        } finally {
-          state.activeSpans.delete(span);
-          span.end();
-        }
-      }
+      {
+        kind: SpanKind.INTERNAL,
+        attributes: startTurn(input, opts, false, traffic),
+      },
+      parent
     );
+    const spanContext = activate(parent, span, continuation);
+
+    return context.with(spanContext, async () => {
+      try {
+        const output = await session.prompt(input, opts);
+        // A turn asking for a tool resolves to content parts, not a string.
+        const turn = readAssistantTurn(output);
+        const after = readContextUsage(session);
+        reconcileContextOverflow(span, state, before, after);
+        span.setAttributes(
+          resultAttributes({
+            session,
+            state,
+            windowTokens,
+            before,
+            output: turn,
+            finishReason:
+              turn.toolCalls.length > 0 ? FINISH_TOOL_CALL : FINISH_STOP,
+            config,
+            after,
+          })
+        );
+        registerToolCalls(state, turn.toolCalls, spanContext);
+        span.setStatus({ code: SpanStatusCode.OK });
+        return output;
+      } catch (err) {
+        const after = readContextUsage(session);
+        reconcileContextOverflow(span, state, before, after);
+        span.setAttributes(
+          resultAttributes({
+            session,
+            state,
+            windowTokens,
+            before,
+            finishReason: finishReasonFor(err),
+            config,
+            after,
+          })
+        );
+        recordError(span, err);
+        throw err;
+      } finally {
+        state.activeSpans.delete(span);
+        span.end();
+      }
+    });
   };
 
   const tracedPromptStreaming = (
     input: LanguageModelPrompt,
     opts?: LanguageModelPromptOptions
-  ) => {
+  ): ReadableStream<LanguageModelStreamChunk> => {
+    const { traffic, continuation, parent } = beginTurn(input);
     const windowTokens = readContextWindow(session);
     const before = readContextUsage(session);
-    const attributes = requestAttributes(
-      state,
-      input,
-      opts,
-      true,
-      config,
-      providerName
-    );
 
     const span = tracer.startSpan(
       "generate_content",
-      { kind: SpanKind.INTERNAL, attributes },
-      context.active()
+      {
+        kind: SpanKind.INTERNAL,
+        attributes: startTurn(input, opts, true, traffic),
+      },
+      parent
     );
-    state.activeSpans.add(span);
+    const spanContext = activate(parent, span, continuation);
 
     const startedAt = performance.now();
     let firstChunkAt: number | null = null;
     let chunkCount = 0;
     let text = "";
+    const toolCalls: ToolCallInfo[] = [];
 
-    const finalize = (
-      finishReason: string,
-      captured: string | undefined
-    ): void => {
+    const finalize = (finishReason: string): void => {
       const after = readContextUsage(session);
       reconcileContextOverflow(span, state, before, after);
       span.setAttributes(
-        resultAttributes(
+        resultAttributes({
           session,
           state,
           windowTokens,
           before,
-          captured,
+          output: { text, toolCalls },
           finishReason,
           config,
-          after
-        )
+          after,
+        })
       );
     };
 
     const pump = async (
-      controller: ReadableStreamDefaultController<string>
+      controller: ReadableStreamDefaultController<LanguageModelStreamChunk>
     ): Promise<void> => {
       const reader = session.promptStreaming(input, opts).getReader();
       let chunk = await reader.read();
       while (!chunk.done) {
         chunkCount += 1;
         firstChunkAt ??= performance.now();
-        text += chunk.value;
+
+        // The stream is heterogeneous: text arrives as bare strings, and each
+        // tool call as its own structured chunk. Both are forwarded untouched,
+        // so the page's own tool loop still sees exactly what Chrome sent.
+        if (typeof chunk.value === "string") {
+          text += chunk.value;
+        } else {
+          const call = toolCallFromChunk(chunk.value);
+          if (call) {
+            toolCalls.push(call);
+          }
+        }
+
         controller.enqueue(chunk.value);
         chunk = await reader.read();
       }
     };
 
-    return new ReadableStream<string>({
+    return new ReadableStream<LanguageModelStreamChunk>({
       async start(controller) {
         try {
-          await pump(controller);
-          finalize("stop", text);
+          await context.with(spanContext, () => pump(controller));
+          finalize(toolCalls.length > 0 ? FINISH_TOOL_CALL : FINISH_STOP);
+          registerToolCalls(state, toolCalls, spanContext);
           span.setStatus({ code: SpanStatusCode.OK });
           controller.close();
         } catch (err) {
-          finalize(finishReasonFor(err), text);
+          finalize(finishReasonFor(err));
           recordError(span, err);
           controller.error(err);
         } finally {
@@ -273,12 +351,16 @@ export function wrapSession(
     });
     try {
       const cloned = await session.clone(opts);
-      // A clone keeps the conversation but starts a distinct session lineage.
-      const childState = createSessionState({
-        conversationId: state.conversationId,
-        sessionId: crypto.randomUUID(),
-        parentSessionId: state.sessionId,
-      });
+      // A clone keeps the conversation and the tools, but starts a distinct
+      // session lineage.
+      const childState = createSessionState(
+        {
+          conversationId: state.conversationId,
+          sessionId: crypto.randomUUID(),
+          parentSessionId: state.sessionId,
+        },
+        [...state.tools.values()]
+      );
       span.setStatus({ code: SpanStatusCode.OK });
       return wrapSession(cloned, childState, tracer, config, providerName);
     } catch (err) {
@@ -350,10 +432,10 @@ export class PromptApiInstrumentation {
     options: LanguageModelCreateOptions
   ): Promise<LanguageModel> {
     const conversationId = crypto.randomUUID();
-    const state = createSessionState({
-      conversationId,
-      sessionId: conversationId,
-    });
+    const state = createSessionState(
+      { conversationId, sessionId: conversationId },
+      options.tools
+    );
 
     const span = this.tracer.startSpan("web_ai.create_session", {
       kind: SpanKind.INTERNAL,
