@@ -1,0 +1,25 @@
+{
+  "name": "@web-ai-otel/devtools-extension",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Chrome DevTools extension for zero-code Web AI tracing",
+  "scripts": {
+    "build": "tsup && node scripts/copy-static.mjs",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@opentelemetry/resources": "^2.1.0",
+    "@opentelemetry/sdk-trace-base": "^2.1.0",
+    "@opentelemetry/sdk-trace-web": "^2.1.0",
+    "@web-ai-otel/core": "workspace:*",
+    "@web-ai-otel/extension-transport": "workspace:*",
+    "@web-ai-otel/instrumentation-prompt-api": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.304",
+    "fake-indexeddb": "^6.0.0",
+    "vitest": "^3.2.7"
+  }
+}

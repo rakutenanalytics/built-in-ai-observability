@@ -1,0 +1,36 @@
+{
+  "name": "@web-ai-otel/extension-transport",
+  "version": "0.1.0",
+  "description": "OpenTelemetry span exporter for Chrome extension transport",
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./protocol": {
+      "types": "./dist/protocol.d.ts",
+      "import": "./dist/protocol.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/core": "^2.1.0",
+    "@opentelemetry/sdk-trace-base": "^2.1.0"
+  },
+  "devDependencies": {
+    "vitest": "^3.2.7"
+  }
+}

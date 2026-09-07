@@ -1,0 +1,18 @@
+{
+  "name": "@web-ai-otel/example-vanilla",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Minimal vanilla JS example using the Web AI browser SDK",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@web-ai-otel/sdk-browser": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2",
+    "vite": "^6.3.5"
+  }
+}

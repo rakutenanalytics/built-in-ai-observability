@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta content="width=device-width, initial-scale=1" name="viewport">
+    <title>AI Traces</title>
+    <link href="panel.css" rel="stylesheet">
+  </head>
+  <body>
+    <header>
+      <div class="views" role="tablist">
+        <button
+          aria-selected="true"
+          class="view-tab"
+          id="view-traces"
+          role="tab"
+          type="button"
+        >
+          Traces
+        </button>
+        <button
+          aria-selected="false"
+          class="view-tab"
+          id="view-sessions"
+          role="tab"
+          type="button"
+        >
+          Sessions
+        </button>
+      </div>
+      <p class="scope" id="scope"></p>
+      <div class="actions">
+        <button id="refresh" type="button">Refresh</button>
+        <button id="export" type="button">Export JSON</button>
+        <button id="clear" type="button">Clear</button>
+      </div>
+    </header>
+    <main>
+      <section aria-label="List" id="trace-list"></section>
+      <section aria-label="Detail" id="trace-detail">
+        <p class="empty">Select an entry to inspect spans.</p>
+      </section>
+    </main>
+    <script src="panel.js" type="module"></script>
+  </body>
+</html>

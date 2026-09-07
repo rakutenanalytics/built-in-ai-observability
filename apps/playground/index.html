@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta content="width=device-width, initial-scale=1" name="viewport">
+    <title>Web AI OTel Playground</title>
+    <style>
+    body {
+      font-family: system-ui, sans-serif;
+      max-width: 720px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+    }
+    textarea {
+      width: 100%;
+      min-height: 80px;
+    }
+    #output {
+      white-space: pre-wrap;
+      background: #f4f4f5;
+      padding: 1rem;
+      border-radius: 6px;
+    }
+    .mode {
+      margin-bottom: 1rem;
+      padding: 0.5rem;
+      background: #eef2ff;
+      border-radius: 4px;
+    }
+    </style>
+  </head>
+  <body>
+    <h1>Web AI OTel Playground</h1>
+    <p class="mode" id="mode-info">Loading…</p>
+    <p>
+      Test the Prompt API with or without the production SDK. Load the
+      <strong>Web AI Traces</strong>
+      DevTools extension to observe unmodified pages.
+    </p>
+    <form id="form">
+      <label>
+        Prompt
+        <textarea id="prompt"></textarea>
+      </label>
+      <div>
+        <button type="submit">Send</button>
+        <button id="stream" type="button">Stream</button>
+        <button id="clone" type="button">Clone session</button>
+        <button id="reset" type="button">Reset session</button>
+      </div>
+    </form>
+    <h2>Output</h2>
+    <div id="output"></div>
+    <script src="/main.ts" type="module"></script>
+  </body>
+</html>

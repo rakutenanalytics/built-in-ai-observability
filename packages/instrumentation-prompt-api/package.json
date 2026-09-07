@@ -1,0 +1,32 @@
+{
+  "name": "@web-ai-otel/instrumentation-prompt-api",
+  "version": "0.1.0",
+  "description": "OpenTelemetry instrumentation for the Chrome Prompt API (LanguageModel)",
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@opentelemetry/api": "^1.9.0",
+    "@web-ai-otel/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@opentelemetry/sdk-trace-base": "^2.1.0",
+    "vitest": "^3.2.7"
+  }
+}

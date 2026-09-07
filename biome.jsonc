@@ -1,0 +1,19 @@
+{
+  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  "extends": ["ultracite/core"],
+  "javascript": {
+    // Web AI APIs and the extension platform are ambient globals.
+    "globals": ["LanguageModel", "chrome"]
+  },
+  "overrides": [
+    {
+      // Barrel files are the intentional public API surface of each package.
+      "includes": ["**/src/index.ts", "**/src/*/index.ts"],
+      "linter": {
+        "rules": {
+          "performance": { "noBarrelFile": "off" }
+        }
+      }
+    }
+  ]
+}
