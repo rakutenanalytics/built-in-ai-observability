@@ -852,5 +852,135 @@ describe("PromptApiInstrumentation", () => {
       );
       expect(toolSpan?.attributes["web_ai.api.name"]).toBe("LanguageModel");
     });
+
+    it("hands a tool run the gap between the turns either side of it", async () => {
+      mockSession.prompt = vi
+        .fn()
+        .mockResolvedValueOnce([
+          toolCallChunk(toolCall("get_weather", { city: "Nagoya" })),
+        ])
+        .mockResolvedValueOnce("It is humid in Nagoya.");
+
+      const session = await LanguageModel.create({ tools: [WEATHER_TOOL] });
+      await session.prompt("weather in Nagoya?");
+      await session.prompt(
+        toolResponseTurn(toolSuccess("get_weather", { tempC: 29 }))
+      );
+
+      const [first, second] = turnSpans();
+      const [toolSpan] = toolSpans();
+      const root = spanNamed("invoke_agent");
+
+      // Timestamps taken at whole-millisecond resolution used to collapse all
+      // three of these into one instant, which left the sibling order for a
+      // viewer to guess at. The handover has to be exact in both directions.
+      expect(startedAt(toolSpan)).toBe(endedAt(first));
+      expect(endedAt(toolSpan)).toBe(startedAt(second));
+      // And the root has to outlast the last turn it holds, not round to before
+      // it.
+      expect(endedAt(root)).toBeGreaterThanOrEqual(endedAt(second));
+      expect(startedAt(root)).toBeLessThanOrEqual(startedAt(first));
+    });
+
+    it("times a tool that returns within a millisecond", async () => {
+      mockSession.prompt = vi
+        .fn()
+        .mockResolvedValueOnce([
+          toolCallChunk(toolCall("get_weather", { city: "Sendai" })),
+        ])
+        .mockResolvedValueOnce("It is cold in Sendai.");
+
+      const session = await LanguageModel.create({ tools: [WEATHER_TOOL] });
+      await session.prompt("weather in Sendai?");
+      // No pause: the tool answers as fast as a lookup in memory does, which is
+      // the case a whole-millisecond clock rounds away to nothing. Reporting
+      // that wait is the one job an execute_tool span has.
+      await session.prompt(
+        toolResponseTurn(toolSuccess("get_weather", { tempC: 3 }))
+      );
+
+      const [toolSpan] = toolSpans();
+      expect(durationMs(toolSpan)).toBeGreaterThan(0);
+    });
+
+    it("labels a call and its tool span with the same id", async () => {
+      mockSession.prompt = vi
+        .fn()
+        .mockResolvedValueOnce([
+          toolCallChunk(toolCall("get_weather", { city: "Hakone" })),
+        ])
+        .mockResolvedValueOnce("It is misty in Hakone.");
+
+      const session = await LanguageModel.create({ tools: [WEATHER_TOOL] });
+      await session.prompt("weather in Hakone?");
+      await session.prompt(
+        toolResponseTurn(toolSuccess("get_weather", { tempC: 14 }))
+      );
+
+      const [turn] = turnSpans();
+      const [toolSpan] = toolSpans();
+      const callId = toolSpan?.attributes["gen_ai.tool.call.id"];
+
+      // Chrome sends no callID, so the instrumentation issues one; without it
+      // nothing joins the turn that asked to the span that answered.
+      expect(callId).toBeTruthy();
+      expect(String(turn?.attributes["gen_ai.output.messages"])).toContain(
+        String(callId)
+      );
+    });
+
+    it("keeps the model's own call id when it sends one", async () => {
+      mockSession.prompt = vi
+        .fn()
+        .mockResolvedValueOnce([
+          toolCallChunk(toolCall("get_weather", { city: "Otaru" }, "call-7")),
+        ])
+        .mockResolvedValueOnce("It is snowing in Otaru.");
+
+      const session = await LanguageModel.create({ tools: [WEATHER_TOOL] });
+      await session.prompt("weather in Otaru?");
+      await session.prompt(
+        toolResponseTurn(toolSuccess("get_weather", { tempC: -2 }, "call-7"))
+      );
+
+      const [toolSpan] = toolSpans();
+      expect(toolSpan?.attributes["gen_ai.tool.call.id"]).toBe("call-7");
+    });
+
+    it("does not let an unplaceable response consume another call", async () => {
+      mockSession.prompt = vi
+        .fn()
+        .mockResolvedValueOnce([
+          toolCallChunk(toolCall("get_weather", { city: "Naha" })),
+        ])
+        .mockResolvedValueOnce("Warm in Naha.");
+
+      const session = await LanguageModel.create({ tools: [WEATHER_TOOL] });
+      await session.prompt("weather in Naha?");
+      // A response for something that was never called, answered alongside the
+      // real one. It used to take the first pending record and wear its
+      // arguments, leaving the real response to fall back to the same one.
+      await session.prompt(
+        toolResponseTurn(
+          toolSuccess("get_tides", { height: 1 }),
+          toolSuccess("get_weather", { tempC: 27 })
+        )
+      );
+
+      const spans = toolSpans();
+      const byName = (name: string) =>
+        spans.find((span) => span.attributes["gen_ai.tool.name"] === name);
+
+      expect(spans).toHaveLength(2);
+      expect(
+        byName("get_tides")?.attributes["web_ai.tool.call_arguments"]
+      ).toBeUndefined();
+      expect(
+        String(byName("get_weather")?.attributes["web_ai.tool.call_arguments"])
+      ).toContain("Naha");
+      expect(byName("get_weather")?.attributes["web_ai.tool.call_index"]).toBe(
+        1
+      );
+    });
   });
 });

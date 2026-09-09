@@ -21,6 +21,7 @@ import {
   readAssistantTurn,
   readContextUsage,
   readContextWindow,
+  spanTimestamp,
   type ToolCallInfo,
   type ToolTraffic,
   toolCallFromChunk,
@@ -118,7 +119,7 @@ export function wrapSession(
    * with nothing when the page moved on without ever coming back with the tool
    * results, which leaves the exchange abandoned rather than answered.
    */
-  const closeExchange = (output?: string | AssistantTurn): void => {
+  const closeExchange = (at: number, output?: string | AssistantTurn): void => {
     const { exchange } = state;
     if (!exchange) {
       return;
@@ -130,7 +131,8 @@ export function wrapSession(
       exchangeResultAttributes({ exchange, output, config })
     );
     exchange.span.setStatus({ code: SpanStatusCode.OK });
-    exchange.span.end();
+    // Ends where its last turn ended, so the root always covers its children.
+    exchange.span.end(at);
   };
 
   /**
@@ -139,7 +141,10 @@ export function wrapSession(
    * tools can need more than one turn, so a session without them keeps the
    * plain single-span shape.
    */
-  const openExchange = (input: LanguageModelPrompt): Context | undefined => {
+  const openExchange = (
+    input: LanguageModelPrompt,
+    startTime: number
+  ): Context | undefined => {
     if (state.tools.size === 0) {
       return;
     }
@@ -148,6 +153,7 @@ export function wrapSession(
       OPERATION_INVOKE_AGENT,
       {
         kind: SpanKind.INTERNAL,
+        startTime,
         attributes: exchangeAttributes({
           state,
           input,
@@ -168,19 +174,21 @@ export function wrapSession(
    * question, so it ends whatever came before and starts its own exchange.
    */
   const beginTurn = (input: LanguageModelPrompt) => {
+    const at = spanTimestamp();
     const traffic = toolTrafficFrom(input);
     const continuation =
       traffic.responses.length > 0 && Boolean(state.exchange);
 
     if (!continuation) {
-      closeExchange();
+      closeExchange(at);
     }
     const parent =
-      (continuation ? state.exchange?.context : openExchange(input)) ??
+      (continuation ? state.exchange?.context : openExchange(input, at)) ??
       context.active();
 
     // Emitted before the turn opens so a tool run sits beside the turns rather
-    // than inside the one being told its result.
+    // than inside the one being told its result. Sharing `at` with the turn
+    // about to start is what keeps the two strictly ordered.
     if (traffic.responses.length > 0) {
       emitToolExecutionSpans({
         tracer,
@@ -189,6 +197,7 @@ export function wrapSession(
         config,
         providerName,
         fallbackParent: parent,
+        endTime: at,
       });
     }
 
@@ -196,7 +205,7 @@ export function wrapSession(
       state.exchange.turns += 1;
     }
 
-    return { traffic, continuation, parent };
+    return { traffic, continuation, parent, startTime: at };
   };
 
   const activate = (parent: Context, span: Span): Context => {
@@ -209,12 +218,12 @@ export function wrapSession(
    * answer the exchange was waiting for; a turn that failed abandons it. Called
    * once the turn's own span has ended, so the exchange outlives what it holds.
    */
-  const settleTurn = (turn: AssistantTurn | undefined): void => {
+  const settleTurn = (turn: AssistantTurn | undefined, at: number): void => {
     if (state.exchange && turn) {
       state.exchange.toolCalls += turn.toolCalls.length;
     }
     if (!turn || turn.toolCalls.length === 0) {
-      closeExchange(turn);
+      closeExchange(at, turn);
     }
   };
 
@@ -242,7 +251,7 @@ export function wrapSession(
     input: LanguageModelPrompt,
     opts?: LanguageModelPromptOptions
   ): Promise<LanguageModelOutput> => {
-    const { traffic, parent } = beginTurn(input);
+    const { traffic, parent, startTime } = beginTurn(input);
     const windowTokens = readContextWindow(session);
     const before = readContextUsage(session);
 
@@ -250,6 +259,7 @@ export function wrapSession(
       "generate_content",
       {
         kind: SpanKind.INTERNAL,
+        startTime,
         attributes: startTurn(input, opts, false, traffic),
       },
       parent
@@ -258,10 +268,24 @@ export function wrapSession(
 
     return context.with(spanContext, async () => {
       let turn: AssistantTurn | undefined;
+      let endedAt: number | undefined;
       try {
         const output = await session.prompt(input, opts);
+        const at = spanTimestamp();
+        endedAt = at;
         // A turn asking for a tool resolves to content parts, not a string.
-        turn = readAssistantTurn(output);
+        const assistant = readAssistantTurn(output);
+        // Registered before the attributes are written so the turn's own
+        // tool_call parts carry the ids the tool spans will be labelled with.
+        turn = {
+          text: assistant.text,
+          toolCalls: registerToolCalls(
+            state,
+            assistant.toolCalls,
+            toolParent(spanContext),
+            at
+          ),
+        };
         const after = readContextUsage(session);
         reconcileContextOverflow(span, state, before, after);
         span.setAttributes(
@@ -277,7 +301,6 @@ export function wrapSession(
             after,
           })
         );
-        registerToolCalls(state, turn.toolCalls, toolParent(spanContext));
         span.setStatus({ code: SpanStatusCode.OK });
         return output;
       } catch (err) {
@@ -297,9 +320,11 @@ export function wrapSession(
         recordError(span, err);
         throw err;
       } finally {
+        // Unset only when the turn failed before it could be timed.
+        const at = endedAt ?? spanTimestamp();
         state.activeSpans.delete(span);
-        span.end();
-        settleTurn(turn);
+        span.end(at);
+        settleTurn(turn, at);
       }
     });
   };
@@ -308,7 +333,7 @@ export function wrapSession(
     input: LanguageModelPrompt,
     opts?: LanguageModelPromptOptions
   ): ReadableStream<LanguageModelStreamChunk> => {
-    const { traffic, parent } = beginTurn(input);
+    const { traffic, parent, startTime } = beginTurn(input);
     const windowTokens = readContextWindow(session);
     const before = readContextUsage(session);
 
@@ -316,6 +341,7 @@ export function wrapSession(
       "generate_content",
       {
         kind: SpanKind.INTERNAL,
+        startTime,
         attributes: startTurn(input, opts, true, traffic),
       },
       parent
@@ -328,7 +354,7 @@ export function wrapSession(
     let text = "";
     const toolCalls: ToolCallInfo[] = [];
 
-    const finalize = (finishReason: string): void => {
+    const finalize = (output: AssistantTurn, finishReason: string): void => {
       const after = readContextUsage(session);
       reconcileContextOverflow(span, state, before, after);
       span.setAttributes(
@@ -337,7 +363,7 @@ export function wrapSession(
           state,
           windowTokens,
           before,
-          output: { text, toolCalls },
+          output,
           finishReason,
           config,
           after,
@@ -374,18 +400,35 @@ export function wrapSession(
     return new ReadableStream<LanguageModelStreamChunk>({
       async start(controller) {
         let turn: AssistantTurn | undefined;
+        let endedAt: number | undefined;
         try {
           await context.with(spanContext, () => pump(controller));
-          turn = { text, toolCalls };
-          finalize(toolCalls.length > 0 ? FINISH_TOOL_CALL : FINISH_STOP);
-          registerToolCalls(state, toolCalls, toolParent(spanContext));
+          const at = spanTimestamp();
+          endedAt = at;
+          // Registered before the attributes are written so the turn's own
+          // tool_call parts carry the ids the tool spans will be labelled with.
+          turn = {
+            text,
+            toolCalls: registerToolCalls(
+              state,
+              toolCalls,
+              toolParent(spanContext),
+              at
+            ),
+          };
+          finalize(
+            turn,
+            turn.toolCalls.length > 0 ? FINISH_TOOL_CALL : FINISH_STOP
+          );
           span.setStatus({ code: SpanStatusCode.OK });
           controller.close();
         } catch (err) {
-          finalize(finishReasonFor(err));
+          finalize({ text, toolCalls }, finishReasonFor(err));
           recordError(span, err);
           controller.error(err);
         } finally {
+          // Unset only when the turn failed before it could be timed.
+          const at = endedAt ?? spanTimestamp();
           span.setAttribute(WEB_AI.CHUNK_COUNT, chunkCount);
           if (firstChunkAt !== null) {
             span.setAttribute(
@@ -394,8 +437,8 @@ export function wrapSession(
             );
           }
           state.activeSpans.delete(span);
-          span.end();
-          settleTurn(turn);
+          span.end(at);
+          settleTurn(turn, at);
         }
       },
     });
@@ -403,7 +446,7 @@ export function wrapSession(
 
   const tracedDestroy = () => {
     // Destroying mid-exchange means the tool results are never coming.
-    closeExchange();
+    closeExchange(spanTimestamp());
 
     const span = tracer.startSpan("web_ai.destroy_session", {
       kind: SpanKind.INTERNAL,

@@ -490,6 +490,37 @@ describe("devtools trace storage", () => {
     expect(traceSpans.map((s) => s.spanId)).toEqual(["earlier"]);
   });
 
+  it("orders siblings that start on the same instant by duration", async () => {
+    // A tool that returns inside the clock's resolution starts when the turn
+    // waiting on its result does. Storage order would otherwise decide which
+    // comes first, and the same trace could read either way.
+    await storage.storeSpan(
+      span({
+        name: "generate_content",
+        traceId: "t1",
+        spanId: "turn-2",
+        parentSpanId: "root",
+        startMs: 2000,
+        endMs: 2400,
+      }),
+      TAB_A
+    );
+    await storage.storeSpan(
+      span({
+        name: "execute_tool get_weather",
+        traceId: "t1",
+        spanId: "tool",
+        parentSpanId: "root",
+        startMs: 2000,
+        endMs: 2000,
+      }),
+      TAB_A
+    );
+
+    const spans = await storage.getSpansForTrace("t1");
+    expect(spans.map((s) => s.spanId)).toEqual(["tool", "turn-2"]);
+  });
+
   it("clears only the requested tab", async () => {
     await storage.storeSpan(
       span({

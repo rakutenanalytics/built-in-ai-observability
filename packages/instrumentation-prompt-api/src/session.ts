@@ -36,7 +36,10 @@ export interface PendingToolCall extends ToolCallInfo {
   /** Stands in for `callID`, which Chrome leaves empty. */
   index: number;
   turnIndex: number;
-  /** Epoch ms of the turn that asked for it, so the tool span can be backdated. */
+  /**
+   * When the turn that asked for it ended, so the tool span can be backdated.
+   * Epoch ms off the monotonic clock — see `spanTimestamp`.
+   */
   runnableAt: number;
   /** Context of the turn that asked for the call. */
   parent: Context;

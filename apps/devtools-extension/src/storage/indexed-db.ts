@@ -479,6 +479,21 @@ export function listSessions(options: {
   );
 }
 
+/**
+ * Orders spans as they ran, with a total order so a trace never renders two
+ * ways. Siblings can still share a start when a tool returns inside the clock's
+ * resolution; the shorter one ran first, since the span it ties with is the one
+ * waiting on its result. `spanId` settles anything left, which keeps repeated
+ * reads of the same trace identical rather than leaving it to storage order.
+ */
+function inRunOrder(a: StoredSpan, b: StoredSpan): number {
+  return (
+    a.startTimeMs - b.startTimeMs ||
+    a.durationMs - b.durationMs ||
+    a.spanId.localeCompare(b.spanId)
+  );
+}
+
 async function spansByIndex(
   index: "traceId" | "conversationId",
   key: string
@@ -487,9 +502,7 @@ async function spansByIndex(
   const tx = db.transaction(SPANS_STORE, "readonly");
   const request = tx.objectStore(SPANS_STORE).index(index).getAll(key);
   await txDone(tx);
-  return (request.result as StoredSpan[]).sort(
-    (a, b) => a.startTimeMs - b.startTimeMs
-  );
+  return (request.result as StoredSpan[]).sort(inRunOrder);
 }
 
 export function getSpansForTrace(traceId: string): Promise<StoredSpan[]> {
@@ -553,5 +566,5 @@ export async function exportSpans(tabId?: number): Promise<StoredSpan[]> {
     tabId === undefined
       ? all
       : all.filter((span) => span.source.tabId === tabId);
-  return scoped.sort((a, b) => a.startTimeMs - b.startTimeMs);
+  return scoped.sort(inRunOrder);
 }
