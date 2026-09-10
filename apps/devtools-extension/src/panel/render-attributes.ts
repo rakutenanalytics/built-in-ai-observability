@@ -62,5 +62,5 @@ export function renderAttributesTab(span: StoredSpan): HTMLElement {
 
   const json = el("pre", "io-body json", JSON.stringify(attrs, null, 2));
 
-  return renderViewSection("Attributes", pretty, json);
+  return renderViewSection(undefined, pretty, json);
 }

@@ -98,19 +98,26 @@ function renderJsonBody(payload: IoPayload): HTMLElement {
   return el("pre", "io-body json", text);
 }
 
-/** One framed block with a Pretty/JSON selector — shared by I/O and attributes. */
+/**
+ * A labelled block with a Pretty/JSON selector. Omit `label` when the parent
+ * tab already names the content — the Attributes tab does not repeat its title.
+ */
 export function renderViewSection(
-  label: string,
+  label: string | undefined,
   prettyBody: HTMLElement,
   jsonBody: HTMLElement
 ): HTMLElement {
   const section = el("section", "io-section");
   const header = el("div", "io-header");
-  header.append(el("h4", "io-label", label));
+  if (label) {
+    header.append(el("h4", "io-label", label));
+  } else {
+    header.classList.add("io-header-solo");
+  }
 
   const select = document.createElement("select");
   select.className = "io-view";
-  select.setAttribute("aria-label", `${label} view`);
+  select.setAttribute("aria-label", label ? `${label} view` : "View");
   for (const view of ["pretty", "json"] as const) {
     const option = document.createElement("option");
     option.value = view;

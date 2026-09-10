@@ -288,9 +288,13 @@ main {
 }
 
 .io-section {
-  border: 1px solid color-mix(in srgb, CanvasText 15%, transparent);
-  border-radius: 6px;
-  overflow: hidden;
+  padding: 0;
+}
+
+.span-io .io-section + .io-section {
+  border-top: 1px solid color-mix(in srgb, CanvasText 12%, transparent);
+  margin-top: 4px;
+  padding-top: 12px;
 }
 
 .io-header {
@@ -298,9 +302,11 @@ main {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 6px 10px;
-  background: color-mix(in srgb, CanvasText 4%, transparent);
-  border-bottom: 1px solid color-mix(in srgb, CanvasText 12%, transparent);
+  padding: 0 0 8px;
+}
+
+.io-header-solo {
+  justify-content: flex-end;
 }
 
 .io-label {
@@ -321,14 +327,17 @@ main {
 
 .io-body {
   margin: 0;
-  padding: 8px 10px;
+  padding: 0;
 }
 
 .io-body.json {
+  padding: 8px 10px;
   font-family: ui-monospace, monospace;
   font-size: 11px;
   white-space: pre-wrap;
   word-break: break-word;
+  border: 1px solid color-mix(in srgb, CanvasText 12%, transparent);
+  border-radius: 6px;
   background: color-mix(in srgb, CanvasText 3%, transparent);
 }
 
