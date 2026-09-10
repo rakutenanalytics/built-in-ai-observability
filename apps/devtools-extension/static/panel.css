@@ -9,6 +9,15 @@
   box-sizing: border-box;
 }
 
+/*
+ * Several panels set their own `display` (grid, flex) to lay themselves out,
+ * which otherwise outranks the UA stylesheet's `[hidden] { display: none }`
+ * at equal specificity — leaving a "hidden" tab panel still visible.
+ */
+[hidden] {
+  display: none !important;
+}
+
 body {
   margin: 0;
   background: Canvas;
@@ -151,23 +160,257 @@ main {
   font-size: 12px;
 }
 
-.span-tree {
+.span-explorer {
+  display: grid;
+  grid-template-columns: minmax(160px, 220px) 1fr;
+  gap: 12px;
+  margin-top: 8px;
+  align-items: start;
+}
+
+.span-explorer-tree {
+  border: 1px solid color-mix(in srgb, CanvasText 15%, transparent);
+  border-radius: 6px;
+  padding: 6px;
+  position: sticky;
+  top: 0;
+  max-height: calc(100vh - 120px);
+  overflow: auto;
+}
+
+.span-explorer-detail {
+  min-width: 0;
+}
+
+.span-tree.compact {
   list-style: none;
   margin: 0;
-  padding-left: 16px;
+  padding-left: 12px;
 }
 
-.span-node {
-  margin: 4px 0;
+.span-tree.compact.root {
+  padding-left: 0;
 }
 
-.span-header {
+.span-node-compact {
+  margin: 1px 0;
+}
+
+.span-node-btn {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.span-node-btn:hover {
+  background: color-mix(in srgb, Highlight 12%, transparent);
+}
+
+.span-node-btn.active {
+  background: color-mix(in srgb, Highlight 25%, transparent);
   font-weight: 600;
 }
 
-.span-timing {
+.span-node-btn.has-error .span-node-name::after {
+  content: " ⚠";
+  color: color-mix(in srgb, Mark 80%, red);
+}
+
+.span-node-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.span-node-duration {
+  font-size: 10px;
+  opacity: 0.7;
+  flex: none;
+}
+
+.span-detail {
+  padding: 2px 0 0;
+}
+
+.span-detail-name {
+  margin: 0 0 6px;
+  font-size: 13px;
+}
+
+.detail-tabs {
+  margin-top: 10px;
+}
+
+.tab-list {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid color-mix(in srgb, CanvasText 15%, transparent);
+  margin-bottom: 10px;
+}
+
+.tab-button {
+  padding: 6px 4px;
+  margin-right: 10px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  opacity: 0.7;
+}
+
+.tab-button:hover {
+  opacity: 1;
+}
+
+.tab-button[aria-selected="true"] {
+  opacity: 1;
+  font-weight: 600;
+  border-bottom-color: Highlight;
+}
+
+.span-io {
+  display: grid;
+  gap: 10px;
+}
+
+.io-section {
+  border: 1px solid color-mix(in srgb, CanvasText 15%, transparent);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.io-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  background: color-mix(in srgb, CanvasText 4%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, CanvasText 12%, transparent);
+}
+
+.io-label {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.io-view {
+  font: inherit;
   font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid color-mix(in srgb, CanvasText 20%, transparent);
+  background: Canvas;
+  color: inherit;
+}
+
+.io-body {
+  margin: 0;
+  padding: 8px 10px;
+}
+
+.io-body.json {
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: color-mix(in srgb, CanvasText 3%, transparent);
+}
+
+.io-body.pretty {
+  display: grid;
+  gap: 8px;
+}
+
+.message-card {
+  border: 1px solid color-mix(in srgb, CanvasText 12%, transparent);
+  border-radius: 6px;
+  padding: 8px 10px;
+  background: Canvas;
+}
+
+.message-role {
+  font-size: 11px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.message-subtitle {
+  font-size: 11px;
+  opacity: 0.75;
+  margin: 4px 0 6px;
+}
+
+.message-content {
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.role-assistant .message-role {
+  color: color-mix(in srgb, Highlight 70%, CanvasText);
+}
+
+.role-tool .message-role,
+.role-user .message-role {
+  color: color-mix(in srgb, CanvasText 80%, transparent);
+}
+
+.tool-call {
+  margin-top: 6px;
+  padding: 8px;
+  border-radius: 4px;
+  background: color-mix(in srgb, CanvasText 4%, transparent);
+}
+
+.tool-call-name {
+  font-weight: 600;
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+.tool-call-raw {
+  margin: 0;
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  white-space: pre-wrap;
+}
+
+.field-list {
+  margin: 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 12px;
+  font-size: 12px;
+}
+
+.field-key {
+  margin: 0;
+  font-weight: 600;
   opacity: 0.8;
+}
+
+.field-value {
+  margin: 0;
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .attrs {

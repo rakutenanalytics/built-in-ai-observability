@@ -8,11 +8,19 @@ import type {
   StoredSpan,
   TraceSummary,
 } from "../storage/indexed-db.js";
+import {
+  el,
+  formatDuration,
+  formatTime,
+  metaList,
+  plural,
+  shortId,
+  toolSuffix,
+} from "./panel-utils.js";
+import { buildSpanExplorer } from "./span-explorer.js";
 
 const REFRESH_DEBOUNCE_MS = 250;
-const MS_PER_SECOND = 1000;
 const SPAN_STATUS_ERROR = 2;
-const SHORT_ID_LENGTH = 8;
 
 type View = "traces" | "sessions";
 
@@ -21,30 +29,6 @@ const inspectedTabId = chrome.devtools.inspectedWindow.tabId;
 let view: View = "traces";
 let selectedId: string | null = null;
 let refreshTimer: number | undefined;
-
-function formatTime(ms: number): string {
-  return new Date(ms).toLocaleTimeString();
-}
-
-function formatDuration(ms: number): string {
-  if (ms < MS_PER_SECOND) {
-    return `${Math.round(ms)}ms`;
-  }
-  return `${(ms / MS_PER_SECOND).toFixed(2)}s`;
-}
-
-function shortId(id: string): string {
-  return id.slice(0, SHORT_ID_LENGTH);
-}
-
-function plural(count: number, noun: string): string {
-  return `${count} ${noun}${count === 1 ? "" : "s"}`;
-}
-
-/** Only shown when tools were actually used, so plain turns stay uncluttered. */
-function toolSuffix(count: number): string {
-  return count > 0 ? ` · ${plural(count, "tool call")}` : "";
-}
 
 async function request<T extends PanelRequest["type"]>(
   message: Extract<PanelRequest, { type: T }>
@@ -56,90 +40,6 @@ async function request<T extends PanelRequest["type"]>(
     throw new Error(response.error);
   }
   return response;
-}
-
-function el(tag: string, className: string, text?: string): HTMLElement {
-  const node = document.createElement(tag);
-  node.className = className;
-  if (text !== undefined) {
-    // textContent throughout: span names, origins and prompts come from the page.
-    node.textContent = text;
-  }
-  return node;
-}
-
-function renderSpanNode(
-  span: StoredSpan,
-  childrenByParent: Map<string, StoredSpan[]>
-): HTMLElement {
-  const li = el("li", "span-node");
-  li.append(
-    el("div", "span-header", span.name),
-    el("div", "span-timing", formatDuration(span.durationMs))
-  );
-
-  if (span.status.code === SPAN_STATUS_ERROR) {
-    li.append(
-      el("div", "span-timing", `error: ${span.status.message ?? "unknown"}`)
-    );
-  }
-
-  li.append(el("pre", "attrs", JSON.stringify(span.attributes, null, 2)));
-
-  for (const event of span.events) {
-    li.append(
-      el(
-        "pre",
-        "attrs",
-        `${event.name} ${JSON.stringify(event.attributes ?? {}, null, 2)}`
-      )
-    );
-  }
-
-  const children = childrenByParent.get(span.spanId);
-  if (children?.length) {
-    const ul = el("ul", "span-tree");
-    for (const child of children) {
-      ul.append(renderSpanNode(child, childrenByParent));
-    }
-    li.append(ul);
-  }
-
-  return li;
-}
-
-function buildSpanTree(spans: StoredSpan[]): HTMLElement {
-  const byId = new Set(spans.map((s) => s.spanId));
-  const childrenByParent = new Map<string, StoredSpan[]>();
-  const roots: StoredSpan[] = [];
-
-  for (const span of spans) {
-    if (span.parentSpanId && byId.has(span.parentSpanId)) {
-      const list = childrenByParent.get(span.parentSpanId) ?? [];
-      list.push(span);
-      childrenByParent.set(span.parentSpanId, list);
-    } else {
-      roots.push(span);
-    }
-  }
-
-  const container = el("ul", "span-tree");
-  for (const root of roots) {
-    container.append(renderSpanNode(root, childrenByParent));
-  }
-  return container;
-}
-
-type MetaEntry = [label: string, value: string | undefined];
-
-function metaList(entries: MetaEntry[]): HTMLElement {
-  const ul = el("ul", "detail-meta");
-  for (const [label, value] of entries) {
-    if (value !== undefined) {
-      ul.append(el("li", "meta", `${label}: ${value}`));
-    }
-  }
-  return ul;
 }
 
 function detailEl(): HTMLElement | null {
@@ -174,7 +74,7 @@ async function showTraceDetail(trace: TraceSummary): Promise<void> {
       ["Duration", formatDuration(trace.durationMs)],
       ["URL", trace.url],
     ]),
-    buildSpanTree(spans ?? [])
+    buildSpanExplorer(spans ?? [])
   );
 }
 
@@ -182,7 +82,8 @@ async function showTraceDetail(trace: TraceSummary): Promise<void> {
  * A session view groups every trace sharing a conversation id. A question
  * answered without tools is a trace of its own, while a tool exchange is one
  * trace holding several turns, so spans are grouped by trace here rather than
- * rendered as a single tree.
+ * rendered as a single tree. Each group gets its own span explorer, so the
+ * selection in one trace never affects another.
  */
 async function showSessionDetail(session: SessionSummary): Promise<void> {
   const target = detailEl();
@@ -232,7 +133,7 @@ async function showSessionDetail(session: SessionSummary): Promise<void> {
     const group = el("section", "trace-group");
     const title = document.createElement("h3");
     title.textContent = `${traceSpans[0]?.name ?? "trace"} · ${shortId(traceId)}`;
-    group.append(title, buildSpanTree(traceSpans));
+    group.append(title, buildSpanExplorer(traceSpans));
     nodes.push(group);
   }
 
