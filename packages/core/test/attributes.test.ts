@@ -8,7 +8,7 @@ import {
   encodeInputMessages,
   encodeOutputMessages,
   encodeSystemInstructions,
-  textFromGenAiMessages,
+  mlflowChatPreview,
 } from "../src/attributes/messages.js";
 
 describe("encodeInputMessages", () => {
@@ -85,14 +85,119 @@ describe("encodeSystemInstructions", () => {
   });
 });
 
-describe("textFromGenAiMessages", () => {
-  it("joins text parts and ignores others", () => {
+describe("mlflowChatPreview", () => {
+  const preview = (
+    messages: Parameters<typeof mlflowChatPreview>[0],
+    maxLength = 0
+  ) => JSON.parse(mlflowChatPreview(messages, maxLength) ?? "null");
+
+  it("joins the text parts of a message into its content", () => {
     expect(
-      textFromGenAiMessages([
-        { parts: [{ type: "text", content: "a" }, { type: "redacted" }] },
-        { parts: [{ type: "text", content: "b" }] },
+      preview([
+        {
+          role: "user",
+          parts: [
+            { type: "text", content: "a" },
+            { type: "text", content: "b" },
+          ],
+        },
       ])
-    ).toBe("a\nb");
+    ).toEqual({ messages: [{ role: "user", content: "a\nb" }] });
+  });
+
+  it("carries a tool call over as an OpenAI tool_calls entry", () => {
+    expect(
+      preview([
+        {
+          role: "assistant",
+          parts: [
+            {
+              type: "tool_call",
+              id: "call-1",
+              name: "get_weather",
+              arguments: { city: "Kyoto" },
+            },
+          ],
+        },
+      ])
+    ).toEqual({
+      messages: [
+        {
+          role: "assistant",
+          content: null,
+          tool_calls: [
+            {
+              id: "call-1",
+              type: "function",
+              function: {
+                name: "get_weather",
+                arguments: '{"city":"Kyoto"}',
+              },
+            },
+          ],
+        },
+      ],
+    });
+  });
+
+  it("lifts a tool result into its own tool message", () => {
+    expect(
+      preview([
+        {
+          role: "user",
+          parts: [
+            {
+              type: "tool_call_response",
+              id: "call-1",
+              name: "get_weather",
+              response: { tempC: 24 },
+            },
+          ],
+        },
+      ])
+    ).toEqual({
+      messages: [
+        { role: "tool", tool_call_id: "call-1", content: '{"tempC":24}' },
+      ],
+    });
+  });
+
+  it("previews a tool error in place of its result", () => {
+    expect(
+      preview([
+        {
+          role: "user",
+          parts: [
+            { type: "tool_call_response", name: "get_weather", error: "boom" },
+          ],
+        },
+      ])
+    ).toEqual({ messages: [{ role: "tool", content: '"boom"' }] });
+  });
+
+  /**
+   * A turn with nothing renderable would otherwise leave the attribute unset,
+   * and MLflow then derives its own copy and shows every message twice.
+   */
+  it("stands in for a redacted modality so the preview is never empty", () => {
+    expect(
+      preview([
+        { role: "user", parts: [{ type: "redacted", modality: "image" }] },
+      ])
+    ).toEqual({ messages: [{ role: "user", content: "[image]" }] });
+  });
+
+  it("returns nothing when there is no part to preview", () => {
+    expect(mlflowChatPreview([{ role: "user", parts: [] }], 0)).toBeUndefined();
+  });
+
+  it("truncates to the configured attribute length", () => {
+    expect(
+      mlflowChatPreview(
+        [{ role: "user", parts: [{ type: "text", content: "hello" }] }],
+        4
+      )
+    ).toBe('{"me…[truncated]');
   });
 });
 

@@ -16,6 +16,13 @@ export const GEN_AI = {
   TOOL_DESCRIPTION: "gen_ai.tool.description",
   TOOL_TYPE: "gen_ai.tool.type",
   TOOL_CALL_ID: "gen_ai.tool.call.id",
+  /**
+   * Opt-in in the spec, so both are gated on content capture. The spec asks for
+   * a structured object and allows a JSON string where the format cannot carry
+   * one, which is the case for OTel span attributes.
+   */
+  TOOL_CALL_ARGUMENTS: "gen_ai.tool.call.arguments",
+  TOOL_CALL_RESULT: "gen_ai.tool.call.result",
 } as const;
 
 /** Experimental Web AI attributes not covered by standard OTel conventions. */
@@ -54,9 +61,6 @@ export const WEB_AI = {
   TOOL_RESPONSE_COUNT: "web_ai.tool.response_count",
   /** Chrome leaves `callID` empty, so calls are identified by position. */
   TOOL_CALL_INDEX: "web_ai.tool.call_index",
-  TOOL_CALL_ARGUMENTS: "web_ai.tool.call_arguments",
-  TOOL_RESULT: "web_ai.tool.result",
-  TOOL_FAILED: "web_ai.tool.failed",
   /** Set on a turn that carries tool responses, continuing an earlier turn. */
   TURN_CONTINUATION: "web_ai.conversation.turn_continuation",
   /** Totals for a whole exchange, recorded on its `invoke_agent` span. */

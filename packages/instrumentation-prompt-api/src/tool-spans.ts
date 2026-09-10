@@ -130,19 +130,18 @@ function toolSpanAttributes(
     attributes[GEN_AI.TOOL_DESCRIPTION] = description;
   }
   if (config.captureInput && pending?.arguments !== undefined) {
-    attributes[WEB_AI.TOOL_CALL_ARGUMENTS] = safeJson(
+    attributes[GEN_AI.TOOL_CALL_ARGUMENTS] = safeJson(
       pending.arguments,
       config.maxAttributeLength
     );
   }
+  // The spec records a result only for a call that succeeded; a failure is left
+  // to `error.type` and the span status.
   if (config.captureOutput && response.result !== undefined) {
-    attributes[WEB_AI.TOOL_RESULT] = safeJson(
+    attributes[GEN_AI.TOOL_CALL_RESULT] = safeJson(
       response.result,
       config.maxAttributeLength
     );
-  }
-  if (response.errorMessage !== undefined) {
-    attributes[WEB_AI.TOOL_FAILED] = true;
   }
 
   return attributes;

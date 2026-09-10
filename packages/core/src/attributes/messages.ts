@@ -1,3 +1,5 @@
+import { TOOL_TYPE_FUNCTION } from "../semantic-conventions/attributes.js";
+import { truncateAttribute } from "./helpers.js";
 import {
   type AssistantTurn,
   readToolCall,
@@ -175,20 +177,6 @@ export function encodeOutputMessages(
   return [{ role: "assistant", parts, finish_reason: finishReason }];
 }
 
-export function textFromGenAiMessages(
-  messages: Array<{ parts?: Array<{ type: string; content?: string }> }>
-): string {
-  const lines: string[] = [];
-  for (const message of messages) {
-    for (const part of message.parts ?? []) {
-      if (part.type === "text" && part.content) {
-        lines.push(part.content);
-      }
-    }
-  }
-  return lines.join("\n");
-}
-
 export function encodeSystemInstructions(
   initialPrompts: PromptMessage[]
 ): TextPart[] | undefined {
@@ -198,15 +186,111 @@ export function encodeSystemInstructions(
   return parts.length > 0 ? parts : undefined;
 }
 
-export function textFromSystemInstructions(
-  parts: Array<{ type: string; content: string }>
-): string {
-  return parts
-    .map((part) => (part.type === "text" ? part.content : ""))
-    .filter(Boolean)
-    .join("\n");
+interface OpenAiToolCall {
+  id?: string;
+  type: string;
+  /** OpenAI carries arguments as a JSON string, not as an object. */
+  function: { name: string; arguments?: string };
 }
 
-export function mlflowChatPreview(role: string, text: string): string {
-  return JSON.stringify({ messages: [{ role, content: text }] });
+interface OpenAiMessage {
+  role: string;
+  content: string | null;
+  tool_call_id?: string;
+  tool_calls?: OpenAiToolCall[];
+}
+
+function safeJson(value: unknown): string | undefined {
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return;
+  }
+}
+
+function openAiToolCall(part: ToolCallPart): OpenAiToolCall {
+  const call: OpenAiToolCall = {
+    type: TOOL_TYPE_FUNCTION,
+    function: { name: part.name, arguments: safeJson(part.arguments ?? {}) },
+  };
+  if (part.id) {
+    call.id = part.id;
+  }
+  return call;
+}
+
+/** A result is its own message here, whatever role the Prompt API used. */
+function openAiToolMessage(part: ToolCallResponsePart): OpenAiMessage {
+  const message: OpenAiMessage = {
+    role: "tool",
+    content:
+      safeJson(part.error === undefined ? part.response : part.error) ?? null,
+  };
+  if (part.id) {
+    message.tool_call_id = part.id;
+  }
+  return message;
+}
+
+interface ShapedParts {
+  text: string[];
+  toolCalls: OpenAiToolCall[];
+  /** Results, which stand on their own rather than joining the message. */
+  toolMessages: OpenAiMessage[];
+}
+
+function shapeParts(parts: EncodedPart[]): ShapedParts {
+  const shaped: ShapedParts = { text: [], toolCalls: [], toolMessages: [] };
+  for (const part of parts) {
+    if (part.type === "text") {
+      shaped.text.push(part.content);
+    } else if (part.type === "tool_call") {
+      shaped.toolCalls.push(openAiToolCall(part));
+    } else if (part.type === "tool_call_response") {
+      shaped.toolMessages.push(openAiToolMessage(part));
+    } else {
+      // Enough to show the turn carried an image or audio, never the value.
+      shaped.text.push(`[${part.modality}]`);
+    }
+  }
+  return shaped;
+}
+
+function openAiMessages(message: {
+  role: string;
+  parts: EncodedPart[];
+}): OpenAiMessage[] {
+  const { text, toolCalls, toolMessages } = shapeParts(message.parts);
+  if (text.length === 0 && toolCalls.length === 0) {
+    return toolMessages;
+  }
+  const entry: OpenAiMessage = {
+    role: message.role,
+    content: text.join("\n") || null,
+  };
+  if (toolCalls.length > 0) {
+    entry.tool_calls = toolCalls;
+  }
+  return [...toolMessages, entry];
+}
+
+/**
+ * Re-shapes GenAI messages as OpenAI chat messages for MLflow.
+ *
+ * MLflow reads mlflow.spanInputs/Outputs both for the trace-table preview
+ * columns and for a span's "Pretty" view. Left unset it derives them from the
+ * GenAI attributes and then renders the derived copy alongside the original, so
+ * every message appears twice; setting them here is what keeps a turn rendering
+ * once. Tool calls and results have to come across too, or the turns that carry
+ * nothing but tool traffic preview as blank.
+ */
+export function mlflowChatPreview(
+  messages: Array<{ role: string; parts: EncodedPart[] }>,
+  maxLength: number
+): string | undefined {
+  const chat = messages.flatMap(openAiMessages);
+  if (chat.length === 0) {
+    return;
+  }
+  return truncateAttribute(JSON.stringify({ messages: chat }), maxLength);
 }

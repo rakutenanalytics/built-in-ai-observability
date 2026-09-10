@@ -18,8 +18,6 @@ import {
   TOOL_TYPE_FUNCTION,
   type ToolCallInfo,
   type ToolTraffic,
-  textFromGenAiMessages,
-  textFromSystemInstructions,
   truncateAttribute,
   WEB_AI,
 } from "@web-ai-otel/core";
@@ -154,11 +152,14 @@ function systemInstructionAttributes(
       config.maxAttributeLength
     ),
   };
-  const text = config.includeMlflowPreview
-    ? textFromSystemInstructions(instructions)
-    : "";
-  if (text) {
-    attributes[MLFLOW_INPUTS] = mlflowChatPreview("system", text);
+  if (config.includeMlflowPreview) {
+    const preview = mlflowChatPreview(
+      [{ role: "system", parts: instructions }],
+      config.maxAttributeLength
+    );
+    if (preview) {
+      attributes[MLFLOW_INPUTS] = preview;
+    }
   }
   return attributes;
 }
@@ -268,16 +269,9 @@ function captureInputAttributes(
   if (!config.includeMlflowPreview) {
     return;
   }
-  const previewText =
-    typeof input === "string"
-      ? input
-      : textFromGenAiMessages(
-          inputMessages as unknown as Array<{
-            parts?: Array<{ type: string; content?: string }>;
-          }>
-        );
-  if (previewText) {
-    attributes[MLFLOW_INPUTS] = mlflowChatPreview("user", previewText);
+  const preview = mlflowChatPreview(inputMessages, config.maxAttributeLength);
+  if (preview) {
+    attributes[MLFLOW_INPUTS] = preview;
   }
 }
 
@@ -342,13 +336,17 @@ function captureOutputAttributes(
   finishReason: string,
   config: InstrumentationConfig
 ): void {
+  const outputMessages = encodeOutputMessages(output, finishReason);
   attributes[GEN_AI.OUTPUT_MESSAGES] = truncateAttribute(
-    JSON.stringify(encodeOutputMessages(output, finishReason)),
+    JSON.stringify(outputMessages),
     config.maxAttributeLength
   );
-  const text = typeof output === "string" ? output : output.text;
-  if (config.includeMlflowPreview && text) {
-    attributes[MLFLOW_OUTPUTS] = mlflowChatPreview("assistant", text);
+  if (!config.includeMlflowPreview) {
+    return;
+  }
+  const preview = mlflowChatPreview(outputMessages, config.maxAttributeLength);
+  if (preview) {
+    attributes[MLFLOW_OUTPUTS] = preview;
   }
 }
 

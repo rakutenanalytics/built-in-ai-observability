@@ -537,6 +537,43 @@ describe("PromptApiInstrumentation", () => {
       expect(output).not.toContain("{}");
     });
 
+    /**
+     * A turn that only calls a tool used to leave the MLflow preview unset, and
+     * MLflow then derives its own from the GenAI attributes and renders both,
+     * showing every message twice.
+     */
+    it("previews tool traffic rather than leaving it to MLflow", async () => {
+      instrumentation.disable();
+      exporter.reset();
+      setup({ includeMlflowPreview: true });
+
+      mockSession.prompt = vi
+        .fn()
+        .mockResolvedValueOnce([
+          toolCallChunk(toolCall("get_weather", { city: "Kyoto" })),
+        ])
+        .mockResolvedValueOnce("It is raining in Kyoto.");
+
+      const session = await LanguageModel.create({ tools: [WEATHER_TOOL] });
+      await session.prompt("weather in Kyoto?");
+      await session.prompt(
+        toolResponseTurn(toolSuccess("get_weather", { tempC: 24 }))
+      );
+
+      const [first, second] = turnSpans();
+      const asked = JSON.parse(String(first?.attributes["mlflow.spanOutputs"]));
+      expect(asked.messages[0].tool_calls[0].function).toEqual({
+        name: "get_weather",
+        arguments: '{"city":"Kyoto"}',
+      });
+
+      const answered = JSON.parse(
+        String(second?.attributes["mlflow.spanInputs"])
+      );
+      expect(answered.messages[0].role).toBe("tool");
+      expect(answered.messages[0].content).toContain("24");
+    });
+
     it("times the tool run and keeps the exchange in one trace", async () => {
       mockSession.prompt = vi
         .fn()
@@ -563,7 +600,7 @@ describe("PromptApiInstrumentation", () => {
         WEATHER_TOOL.description
       );
       expect(toolSpan?.attributes["web_ai.tool.call_index"]).toBe(1);
-      expect(String(toolSpan?.attributes["web_ai.tool.result"])).toContain(
+      expect(String(toolSpan?.attributes["gen_ai.tool.call.result"])).toContain(
         "24"
       );
 
@@ -788,8 +825,8 @@ describe("PromptApiInstrumentation", () => {
       const [toolSpan] = toolSpans();
       expect(toolSpan?.status.code).toBe(SPAN_STATUS_ERROR);
       expect(toolSpan?.status.message).toBe('missing "city"');
-      expect(toolSpan?.attributes["web_ai.tool.failed"]).toBe(true);
       expect(toolSpan?.attributes["error.type"]).toBe("ToolError");
+      expect(toolSpan?.attributes["gen_ai.tool.call.result"]).toBeUndefined();
     });
 
     it("keeps tool payloads out of spans when capture is off", async () => {
@@ -820,9 +857,9 @@ describe("PromptApiInstrumentation", () => {
       expect(turn?.attributes["gen_ai.output.messages"]).toBeUndefined();
       expect(toolSpan?.attributes["gen_ai.tool.name"]).toBe("get_weather");
       expect(
-        toolSpan?.attributes["web_ai.tool.call_arguments"]
+        toolSpan?.attributes["gen_ai.tool.call.arguments"]
       ).toBeUndefined();
-      expect(toolSpan?.attributes["web_ai.tool.result"]).toBeUndefined();
+      expect(toolSpan?.attributes["gen_ai.tool.call.result"]).toBeUndefined();
       expect(
         spanNamed("web_ai.create_session")?.attributes[
           "gen_ai.tool.definitions"
@@ -973,10 +1010,10 @@ describe("PromptApiInstrumentation", () => {
 
       expect(spans).toHaveLength(2);
       expect(
-        byName("get_tides")?.attributes["web_ai.tool.call_arguments"]
+        byName("get_tides")?.attributes["gen_ai.tool.call.arguments"]
       ).toBeUndefined();
       expect(
-        String(byName("get_weather")?.attributes["web_ai.tool.call_arguments"])
+        String(byName("get_weather")?.attributes["gen_ai.tool.call.arguments"])
       ).toContain("Naha");
       expect(byName("get_weather")?.attributes["web_ai.tool.call_index"]).toBe(
         1
