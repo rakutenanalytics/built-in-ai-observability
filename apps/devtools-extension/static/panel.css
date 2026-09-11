@@ -32,33 +32,55 @@ header {
   border-bottom: 1px solid color-mix(in srgb, CanvasText 20%, transparent);
 }
 
-.views {
-  display: flex;
-  gap: 2px;
+.toggle-btn {
   flex: none;
-}
-
-.view-tab {
-  padding: 4px 12px;
+  padding: 3px 10px;
   border: 1px solid color-mix(in srgb, CanvasText 20%, transparent);
+  border-radius: 4px;
   background: transparent;
   color: inherit;
-  cursor: pointer;
   font: inherit;
+  font-size: 12px;
+  cursor: pointer;
 }
 
-.view-tab:first-child {
+.toggle-btn[aria-pressed="true"] {
+  background: color-mix(in srgb, Highlight 25%, transparent);
+  font-weight: 600;
+}
+
+.view-toggle {
+  display: flex;
+}
+
+.view-toggle .toggle-btn:first-child {
   border-radius: 4px 0 0 4px;
 }
 
-.view-tab:last-child {
+.view-toggle .toggle-btn:last-child {
   border-radius: 0 4px 4px 0;
   border-left-width: 0;
 }
 
-.view-tab[aria-selected="true"] {
-  background: color-mix(in srgb, Highlight 25%, transparent);
-  font-weight: 600;
+.icon-btn {
+  flex: none;
+  padding: 2px 7px;
+  border: 1px solid color-mix(in srgb, CanvasText 20%, transparent);
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.icon-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, Highlight 15%, transparent);
+}
+
+.icon-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 .scope {
@@ -77,34 +99,51 @@ header {
   flex: none;
 }
 
+/* The list owns the full width; trace detail arrives as an overlay instead. */
 main {
-  display: grid;
-  grid-template-columns: 280px 1fr;
   min-height: calc(100vh - 41px);
 }
 
 #trace-list {
-  border-right: 1px solid color-mix(in srgb, CanvasText 20%, transparent);
-  overflow: auto;
-  max-height: calc(100vh - 41px);
-}
-
-#trace-detail {
-  padding: 12px;
   overflow: auto;
   max-height: calc(100vh - 41px);
 }
 
 .trace-item {
-  display: block;
+  display: grid;
+  gap: 2px;
   width: 100%;
-  padding: 8px 12px;
+  padding: 7px 12px;
   border: 0;
   border-bottom: 1px solid color-mix(in srgb, CanvasText 10%, transparent);
   background: transparent;
   color: inherit;
+  font: inherit;
   text-align: left;
   cursor: pointer;
+}
+
+.trace-row-top {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.trace-row-right {
+  margin-left: auto;
+  flex: none;
+}
+
+.trace-row-preview {
+  display: flex;
+  gap: 12px;
+  min-width: 0;
+}
+
+.trace-row-preview .preview {
+  flex: 1 1 50%;
+  min-width: 0;
 }
 
 .trace-item:hover,
@@ -138,6 +177,46 @@ main {
   color: color-mix(in srgb, Mark 80%, red);
 }
 
+.session-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 12px;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, CanvasText 10%, transparent);
+  background: color-mix(in srgb, CanvasText 4%, transparent);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.session-row:hover {
+  background: color-mix(in srgb, Highlight 12%, transparent);
+}
+
+.session-row .name {
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.session-row .meta {
+  font-size: 11px;
+  opacity: 0.75;
+}
+
+.chevron {
+  flex: none;
+  width: 10px;
+  font-size: 11px;
+  opacity: 0.85;
+}
+
+.session-traces .trace-item {
+  padding-left: 30px;
+}
+
 .detail-meta {
   display: flex;
   flex-wrap: wrap;
@@ -149,37 +228,190 @@ main {
   opacity: 0.8;
 }
 
-.trace-group {
-  margin: 0 0 12px;
-  padding: 8px 0 0;
-  border-top: 1px solid color-mix(in srgb, CanvasText 15%, transparent);
+.drawer {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  background: Canvas;
 }
 
-.trace-group > h3 {
+.drawer-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  padding: 6px 10px;
+  border-bottom: 1px solid color-mix(in srgb, CanvasText 20%, transparent);
+}
+
+.drawer-nav {
+  display: flex;
+  gap: 2px;
+  flex: none;
+}
+
+.drawer-title {
+  margin: 0;
+  flex: none;
+  font-size: 13px;
+}
+
+.drawer-title.has-error::after {
+  content: " ⚠";
+  color: color-mix(in srgb, Mark 80%, red);
+}
+
+.drawer-summary {
+  margin: 0;
+  flex: 1;
+  font-size: 11px;
+  opacity: 0.75;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.drawer-body {
+  flex: 1;
+  padding: 10px 12px;
+  overflow: auto;
+}
+
+.spans-section {
+  margin: 0 0 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid color-mix(in srgb, CanvasText 15%, transparent);
+}
+
+.spans-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.spans-title {
   margin: 0;
   font-size: 12px;
 }
 
-.span-explorer {
-  display: grid;
-  grid-template-columns: minmax(160px, 220px) 1fr;
-  gap: 12px;
-  margin-top: 8px;
-  align-items: start;
+.spans-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
-.span-explorer-tree {
-  border: 1px solid color-mix(in srgb, CanvasText 15%, transparent);
-  border-radius: 6px;
-  padding: 6px;
-  position: sticky;
+.span-browser-detail {
+  min-width: 0;
+}
+
+/*
+ * Rows share one column template rather than sizing to content, so every bar
+ * measures against the same track. `auto` columns would resolve per row and
+ * leave the bars misaligned.
+ */
+.timeline-axis-row,
+.timeline-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 52px minmax(0, 1.7fr);
+  gap: 0 8px;
+  align-items: center;
+}
+
+.timeline-axis-spacer {
+  grid-column: 1 / 3;
+}
+
+.timeline-axis {
+  position: relative;
+  grid-column: 3;
+  height: 14px;
+}
+
+.timeline-tick {
+  position: absolute;
   top: 0;
-  max-height: calc(100vh - 120px);
+  font-size: 10px;
+  opacity: 0.6;
+  white-space: nowrap;
+}
+
+.timeline-tick.centered {
+  transform: translateX(-50%);
+}
+
+.timeline-rows {
+  max-height: 40vh;
   overflow: auto;
 }
 
-.span-explorer-detail {
-  min-width: 0;
+.timeline-row {
+  /* Buttons size to their content, which would give every row its own
+   * column widths and leave the bars out of step with the axis. */
+  width: 100%;
+  padding: 2px 4px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.timeline-row:hover {
+  background: color-mix(in srgb, Highlight 12%, transparent);
+}
+
+.timeline-row.active {
+  background: color-mix(in srgb, Highlight 22%, transparent);
+  font-weight: 600;
+}
+
+.timeline-name {
+  padding-left: calc(var(--depth, 0) * 10px);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.timeline-duration {
+  font-size: 10px;
+  opacity: 0.7;
+  text-align: right;
+}
+
+.timeline-track {
+  position: relative;
+  height: 16px;
+  background-image: repeating-linear-gradient(
+    to right,
+    color-mix(in srgb, CanvasText 12%, transparent) 0 1px,
+    transparent 1px var(--tick-step, 25%)
+  );
+}
+
+.timeline-bar {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 9px;
+  min-width: 2px;
+  border-radius: 2px;
+  background: color-mix(in srgb, Highlight 65%, CanvasText 10%);
+}
+
+.timeline-row.has-error .timeline-bar {
+  background: color-mix(in srgb, Mark 70%, red);
+}
+
+.timeline-row.has-error .timeline-name::after {
+  content: " ⚠";
+  color: color-mix(in srgb, Mark 80%, red);
 }
 
 .span-tree.compact {
@@ -190,6 +422,8 @@ main {
 
 .span-tree.compact.root {
   padding-left: 0;
+  max-height: 40vh;
+  overflow: auto;
 }
 
 .span-node-compact {
@@ -435,4 +669,8 @@ main {
 
 .empty {
   opacity: 0.7;
+}
+
+.list-empty {
+  padding: 12px;
 }

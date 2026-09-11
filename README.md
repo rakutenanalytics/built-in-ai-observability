@@ -168,14 +168,11 @@ The root exists because a trace is summarised from its root, and the answer only
 
 Conversation-level context comes from the **session**, which spans more than one exchange: every span carries `gen_ai.conversation.id` (mirrored to `session.id` and `web_ai.session.id`), and clones inherit the conversation while getting a fresh `web_ai.session.id` plus `web_ai.session.parent_id`.
 
-The DevTools panel therefore offers two views, mirroring how MLflow separates traces from chat sessions:
+The DevTools panel therefore lists every trace newest first — root span name, request/response previews, span count, tool calls and duration — with a **Group by session** toggle that collapses them under their `gen_ai.conversation.id`, each group showing turn count, duration, context-window usage and errors. This follows MLflow, which retired its separate sessions view in favour of the same toggle. Spans without a conversation (such as `web_ai.check_availability`) stay listed on their own when grouped.
 
-| View | Shows |
-| --- | --- |
-| **Traces** | Every individual trace, newest first, with the root span's request/response previews, span count and duration |
-| **Sessions** | Traces grouped by `gen_ai.conversation.id`, with request/response previews, turn count, errors, and context-window usage |
+Selecting a trace opens it in a drawer over the list, so the request and response get the full panel width even when DevTools is docked to the side. The drawer stacks a span timeline above the detail of the selected span: one row per span with a proportional bar against the trace's own window, nesting shown by indentation, and arrows in the header to step through neighbouring traces. A nested list is available as an alternative view, and a single-span trace skips the section entirely.
 
-Both views are scoped to the tab you are inspecting, and the header shows which tab and origin that is. Spans without a conversation (such as `web_ai.check_availability`) appear only under Traces.
+The list is scoped to the tab you are inspecting, and the header shows which tab and origin that is.
 
 Stored data is a disposable local cache: traces (with their spans) and sessions are each capped independently and pruned oldest-first, and closing a tab clears its traces.
 

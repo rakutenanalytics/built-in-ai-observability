@@ -1,0 +1,185 @@
+import type { SessionSummary, TraceSummary } from "../storage/indexed-db.js";
+import { contextUtilizationLabel } from "./context-meta.js";
+import {
+  el,
+  formatDuration,
+  formatTime,
+  isErrorStatus,
+  plural,
+  shortId,
+  toolSuffix,
+} from "./panel-utils.js";
+
+const COLLAPSED_CHEVRON = "▸";
+const EXPANDED_CHEVRON = "▾";
+
+export interface TraceListRender {
+  rows: HTMLElement[];
+  /** Traces in display order, so the drawer can step through them. */
+  order: TraceSummary[];
+}
+
+function traceRow(
+  trace: TraceSummary,
+  onOpen: (trace: TraceSummary) => void
+): HTMLElement {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = isErrorStatus(trace.statusCode)
+    ? "trace-item has-error"
+    : "trace-item";
+  button.dataset.traceId = trace.traceId;
+
+  const top = el("span", "trace-row-top");
+  top.append(
+    el("span", "name", trace.rootSpanName),
+    el(
+      "span",
+      "meta",
+      `${plural(trace.spanCount, "span")}${toolSuffix(trace.toolCallCount)}`
+    ),
+    el(
+      "span",
+      "trace-row-right meta",
+      `${formatTime(trace.startTimeMs)} · ${formatDuration(trace.durationMs)}`
+    )
+  );
+  button.append(top);
+
+  if (trace.request || trace.response) {
+    const preview = el("span", "trace-row-preview");
+    if (trace.request) {
+      preview.append(el("span", "preview", trace.request));
+    }
+    if (trace.response) {
+      preview.append(el("span", "preview response", trace.response));
+    }
+    button.append(preview);
+  }
+
+  button.addEventListener("click", () => onOpen(trace));
+  return button;
+}
+
+export function renderFlatList(
+  traces: TraceSummary[],
+  onOpen: (trace: TraceSummary) => void
+): TraceListRender {
+  return {
+    rows: traces.map((trace) => traceRow(trace, onOpen)),
+    order: [...traces],
+  };
+}
+
+function sessionMeta(
+  session: SessionSummary | undefined,
+  traces: TraceSummary[]
+): string {
+  if (!session) {
+    return plural(traces.length, "trace");
+  }
+  const parts = [
+    plural(session.turnCount, "turn"),
+    formatDuration(session.durationMs),
+  ];
+  const context = contextUtilizationLabel(session);
+  if (context) {
+    parts.push(`${context} context`);
+  }
+  if (session.errorCount > 0) {
+    parts.push(plural(session.errorCount, "error"));
+  }
+  return parts.join(" · ");
+}
+
+function sessionGroup(
+  conversationId: string,
+  session: SessionSummary | undefined,
+  traces: TraceSummary[],
+  onOpen: (trace: TraceSummary) => void,
+  expanded: boolean
+): HTMLElement {
+  const group = el("div", "session-group");
+  const header = document.createElement("button");
+  header.type = "button";
+  header.className = "session-row";
+  header.setAttribute("aria-expanded", String(expanded));
+
+  const chevron = el(
+    "span",
+    "chevron",
+    expanded ? EXPANDED_CHEVRON : COLLAPSED_CHEVRON
+  );
+  header.append(
+    chevron,
+    el("span", "name", `Session ${shortId(conversationId)}`),
+    el("span", "meta", sessionMeta(session, traces))
+  );
+
+  const children = el("div", "session-traces");
+  children.hidden = !expanded;
+  for (const trace of traces) {
+    children.append(traceRow(trace, onOpen));
+  }
+
+  header.addEventListener("click", () => {
+    const open = header.getAttribute("aria-expanded") === "true";
+    header.setAttribute("aria-expanded", String(!open));
+    chevron.textContent = open ? COLLAPSED_CHEVRON : EXPANDED_CHEVRON;
+    children.hidden = open;
+  });
+
+  group.append(header, children);
+  return group;
+}
+
+/**
+ * Sessions as expandable groups over the same trace rows, following MLflow's
+ * move away from a separate sessions view. Traces recorded outside a session
+ * still list on their own, so nothing is hidden by the grouping.
+ */
+export function renderGroupedList(
+  traces: TraceSummary[],
+  sessions: SessionSummary[],
+  onOpen: (trace: TraceSummary) => void
+): TraceListRender {
+  const sessionById = new Map(sessions.map((s) => [s.conversationId, s]));
+  const grouped = new Map<string, TraceSummary[]>();
+  const ungrouped: TraceSummary[] = [];
+
+  for (const trace of traces) {
+    if (!trace.conversationId) {
+      ungrouped.push(trace);
+      continue;
+    }
+    const list = grouped.get(trace.conversationId) ?? [];
+    list.push(trace);
+    grouped.set(trace.conversationId, list);
+  }
+
+  const rows: HTMLElement[] = [];
+  const order: TraceSummary[] = [];
+  // Traces arrive newest first, so the first group is the session being worked
+  // on — the only one worth opening expanded.
+  let isNewest = true;
+  for (const [conversationId, groupTraces] of grouped) {
+    rows.push(
+      sessionGroup(
+        conversationId,
+        sessionById.get(conversationId),
+        groupTraces,
+        onOpen,
+        isNewest
+      )
+    );
+    order.push(...groupTraces);
+    isNewest = false;
+  }
+
+  for (const trace of ungrouped) {
+    rows.push(traceRow(trace, onOpen));
+    order.push(trace);
+  }
+
+  return { rows, order };
+}

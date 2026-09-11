@@ -8,26 +8,14 @@
   </head>
   <body>
     <header>
-      <div class="views" role="tablist">
-        <button
-          aria-selected="true"
-          class="view-tab"
-          id="view-traces"
-          role="tab"
-          type="button"
-        >
-          Traces
-        </button>
-        <button
-          aria-selected="false"
-          class="view-tab"
-          id="view-sessions"
-          role="tab"
-          type="button"
-        >
-          Sessions
-        </button>
-      </div>
+      <button
+        aria-pressed="false"
+        class="toggle-btn"
+        id="group-by-session"
+        type="button"
+      >
+        Group by session
+      </button>
       <p class="scope" id="scope"></p>
       <div class="actions">
         <button id="refresh" type="button">Refresh</button>
@@ -36,11 +24,9 @@
       </div>
     </header>
     <main>
-      <section aria-label="List" id="trace-list"></section>
-      <section aria-label="Detail" id="trace-detail">
-        <p class="empty">Select an entry to inspect spans.</p>
-      </section>
+      <section aria-label="Traces" id="trace-list"></section>
     </main>
+    <div id="drawer-host"></div>
     <script src="panel.js" type="module"></script>
   </body>
 </html>

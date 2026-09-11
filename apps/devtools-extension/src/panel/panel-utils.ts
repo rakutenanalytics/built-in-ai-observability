@@ -1,6 +1,13 @@
 const MS_PER_SECOND = 1000;
 const SHORT_ID_LENGTH = 8;
 
+/** `SpanStatusCode.ERROR` from the OpenTelemetry API, without the dependency. */
+const SPAN_STATUS_ERROR = 2;
+
+export function isErrorStatus(code: number): boolean {
+  return code === SPAN_STATUS_ERROR;
+}
+
 export function el(tag: string, className: string, text?: string): HTMLElement {
   const node = document.createElement(tag);
   node.className = className;
@@ -9,6 +16,19 @@ export function el(tag: string, className: string, text?: string): HTMLElement {
     node.textContent = text;
   }
   return node;
+}
+
+export function iconButton(
+  label: string,
+  tooltip: string,
+  className = "icon-btn"
+): HTMLButtonElement {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = className;
+  button.textContent = label;
+  button.title = tooltip;
+  return button;
 }
 
 export function formatTime(ms: number): string {
@@ -45,6 +65,16 @@ export function metaList(entries: MetaEntry[]): HTMLElement {
     }
   }
   return ul;
+}
+
+/**
+ * One way of browsing a trace's spans. Both the timeline and the compact list
+ * satisfy it, so the span browser can swap between them without knowing which
+ * it holds.
+ */
+export interface SpanView {
+  element: HTMLElement;
+  setActive(spanId: string): void;
 }
 
 export interface TabDef {
