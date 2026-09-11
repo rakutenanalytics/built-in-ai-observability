@@ -650,6 +650,9 @@ describe("PromptApiInstrumentation", () => {
       expect(String(root?.attributes["gen_ai.output.messages"])).toContain(
         "It is raining in Kyoto."
       );
+      expect(
+        root?.attributes["web_ai.context.utilization_after"]
+      ).toBeDefined();
     });
 
     it("keeps the exchange around everything it holds", async () => {

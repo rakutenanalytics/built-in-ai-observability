@@ -128,7 +128,14 @@ export function wrapSession(
     state.pendingCalls = [];
 
     exchange.span.setAttributes(
-      exchangeResultAttributes({ exchange, output, config })
+      exchangeResultAttributes({
+        exchange,
+        output,
+        config,
+        windowTokens: exchange.windowTokens ?? readContextWindow(session),
+        usageBefore: exchange.usageBefore,
+        usageAfter: readContextUsage(session),
+      })
     );
     exchange.span.setStatus({ code: SpanStatusCode.OK });
     // Ends where its last turn ended, so the root always covers its children.
@@ -164,7 +171,14 @@ export function wrapSession(
       context.active()
     );
     const spanContext = trace.setSpan(context.active(), span);
-    state.exchange = { span, context: spanContext, turns: 0, toolCalls: 0 };
+    state.exchange = {
+      span,
+      context: spanContext,
+      turns: 0,
+      toolCalls: 0,
+      windowTokens: readContextWindow(session),
+      usageBefore: readContextUsage(session),
+    };
     return spanContext;
   };
 

@@ -8,6 +8,7 @@ import type {
   StoredSpan,
   TraceSummary,
 } from "../storage/indexed-db.js";
+import { contextUtilizationLabel } from "./context-meta.js";
 import {
   el,
   formatDuration,
@@ -72,6 +73,7 @@ async function showTraceDetail(trace: TraceSummary): Promise<void> {
         trace.toolCallCount > 0 ? String(trace.toolCallCount) : undefined,
       ],
       ["Duration", formatDuration(trace.durationMs)],
+      ["Context", contextUtilizationLabel(trace)],
       ["URL", trace.url],
     ]),
     buildSpanExplorer(spans ?? [])
@@ -99,11 +101,6 @@ async function showSessionDetail(session: SessionSummary): Promise<void> {
   const heading = document.createElement("h2");
   heading.textContent = `Session ${shortId(session.conversationId)}`;
 
-  const context =
-    session.contextUsage !== undefined && session.contextWindow !== undefined
-      ? `${session.contextUsage} / ${session.contextWindow} tokens`
-      : undefined;
-
   const nodes: Node[] = [
     heading,
     metaList([
@@ -117,7 +114,7 @@ async function showSessionDetail(session: SessionSummary): Promise<void> {
       ],
       ["Errors", session.errorCount ? String(session.errorCount) : undefined],
       ["Duration", formatDuration(session.durationMs)],
-      ["Context", context],
+      ["Context", contextUtilizationLabel(session)],
       ["URL", session.url],
     ]),
   ];

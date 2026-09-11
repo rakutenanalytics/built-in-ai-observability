@@ -109,6 +109,7 @@ describe("devtools trace storage", () => {
       origin: "https://a.test",
       tabId: 1,
       conversationId: CONVERSATION,
+      contextWindow: 9216,
     });
     expect(trace.durationMs).toBeCloseTo(40);
 
@@ -121,6 +122,54 @@ describe("devtools trace storage", () => {
       errorCount: 0,
       contextWindow: 9216,
       tabId: 1,
+    });
+  });
+
+  it("tracks the latest context utilization on traces and sessions", async () => {
+    await storage.storeSpan(
+      span({
+        name: "generate_content",
+        traceId: "t1",
+        spanId: "s1",
+        startMs: 1000,
+        endMs: 1100,
+        conversationId: CONVERSATION,
+        attributes: {
+          "web_ai.context.window_tokens": 1000,
+          "web_ai.context.usage_after_tokens": 200,
+          "web_ai.context.utilization_after": 0.2,
+        },
+      }),
+      TAB_A
+    );
+    await storage.storeSpan(
+      span({
+        name: "generate_content",
+        traceId: "t1",
+        spanId: "s2",
+        startMs: 1200,
+        endMs: 1300,
+        conversationId: CONVERSATION,
+        attributes: {
+          "web_ai.context.window_tokens": 1000,
+          "web_ai.context.usage_after_tokens": 450,
+          "web_ai.context.utilization_after": 0.45,
+        },
+      }),
+      TAB_A
+    );
+
+    const [trace] = await storage.listTraces({});
+    const [session] = await storage.listSessions({});
+    expect(trace).toMatchObject({
+      contextWindow: 1000,
+      contextUsage: 450,
+      contextUtilization: 0.45,
+    });
+    expect(session).toMatchObject({
+      contextWindow: 1000,
+      contextUsage: 450,
+      contextUtilization: 0.45,
     });
   });
 

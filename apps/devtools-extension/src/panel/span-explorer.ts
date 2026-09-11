@@ -1,4 +1,8 @@
 import type { StoredSpan } from "../storage/indexed-db.js";
+import {
+  contextUtilizationFromAttributes,
+  formatContextUtilization,
+} from "./context-meta.js";
 import { spanInputs, spanOutputs } from "./message-preview.js";
 import {
   buildTabs,
@@ -92,16 +96,58 @@ function renderEventsTab(span: StoredSpan): HTMLElement {
  * them, so a span with a long attribute dump doesn't push its preview out of
  * view.
  */
-function renderSpanDetail(span: StoredSpan): HTMLElement {
+function descendantSpans(
+  spanId: string,
+  childrenByParent: Map<string, StoredSpan[]>
+): StoredSpan[] {
+  const descendants: StoredSpan[] = [];
+  for (const child of childrenByParent.get(spanId) ?? []) {
+    descendants.push(child, ...descendantSpans(child.spanId, childrenByParent));
+  }
+  return descendants;
+}
+
+/**
+ * `invoke_agent` roots often predate the attribute on the span itself, so fall
+ * back to the latest descendant that recorded context usage after a turn.
+ */
+function spanContextUtilization(
+  span: StoredSpan,
+  groups: SpanGroups
+): number | undefined {
+  const own = contextUtilizationFromAttributes(span.attributes);
+  if (own !== undefined) {
+    return own;
+  }
+
+  let latest: StoredSpan | undefined;
+  for (const child of descendantSpans(span.spanId, groups.childrenByParent)) {
+    if (contextUtilizationFromAttributes(child.attributes) === undefined) {
+      continue;
+    }
+    if (!latest || child.startTimeMs >= latest.startTimeMs) {
+      latest = child;
+    }
+  }
+  return latest
+    ? contextUtilizationFromAttributes(latest.attributes)
+    : undefined;
+}
+
+function renderSpanDetail(span: StoredSpan, groups: SpanGroups): HTMLElement {
   const container = el("div", "span-detail");
   const heading = document.createElement("h3");
   heading.className = "span-detail-name";
   heading.textContent = span.name;
   container.append(heading);
 
+  const context = formatContextUtilization(
+    spanContextUtilization(span, groups)
+  );
   const metaEntries: MetaEntry[] = [
     ["Duration", formatDuration(span.durationMs)],
     ["Started", formatTime(span.startTimeMs)],
+    ["Context", context],
   ];
   if (span.status.code === SPAN_STATUS_ERROR) {
     metaEntries.push(["Error", span.status.message ?? "unknown"]);
@@ -139,7 +185,7 @@ export function buildSpanExplorer(spans: StoredSpan[]): HTMLElement {
     )) {
       btn.classList.toggle("active", btn.dataset.spanId === span.spanId);
     }
-    detail.replaceChildren(renderSpanDetail(span));
+    detail.replaceChildren(renderSpanDetail(span, groups));
   };
 
   const list = el("ul", "span-tree compact root");

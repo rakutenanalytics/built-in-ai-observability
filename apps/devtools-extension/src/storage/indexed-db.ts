@@ -25,6 +25,7 @@ const INPUT_MESSAGES = "gen_ai.input.messages";
 const OUTPUT_MESSAGES = "gen_ai.output.messages";
 const CONTEXT_WINDOW = "web_ai.context.window_tokens";
 const CONTEXT_USAGE_AFTER = "web_ai.context.usage_after_tokens";
+const CONTEXT_UTILIZATION_AFTER = "web_ai.context.utilization_after";
 const OPERATION_NAME = "gen_ai.operation.name";
 const TURN_SPAN_NAME = "generate_content";
 const EXECUTE_TOOL_OPERATION = "execute_tool";
@@ -55,6 +56,9 @@ export interface TraceSummary {
   /** The question and the answer, both taken from the root span. */
   request?: string;
   response?: string;
+  contextWindow?: number;
+  contextUsage?: number;
+  contextUtilization?: number;
 }
 
 /**
@@ -80,6 +84,38 @@ export interface SessionSummary {
   response?: string;
   contextWindow?: number;
   contextUsage?: number;
+  contextUtilization?: number;
+}
+
+function contextFromSpan(span: StoredSpan): {
+  contextWindow?: number;
+  contextUsage?: number;
+  contextUtilization?: number;
+} {
+  return {
+    contextWindow: numberAttr(span, CONTEXT_WINDOW),
+    contextUsage: numberAttr(span, CONTEXT_USAGE_AFTER),
+    contextUtilization: numberAttr(span, CONTEXT_UTILIZATION_AFTER),
+  };
+}
+
+function mergeContext<
+  T extends {
+    contextWindow?: number;
+    contextUsage?: number;
+    contextUtilization?: number;
+  },
+>(
+  existing: T | undefined,
+  span: StoredSpan
+): Pick<T, "contextWindow" | "contextUsage" | "contextUtilization"> {
+  const latest = contextFromSpan(span);
+  return {
+    contextWindow: latest.contextWindow ?? existing?.contextWindow,
+    contextUsage: latest.contextUsage ?? existing?.contextUsage,
+    contextUtilization:
+      latest.contextUtilization ?? existing?.contextUtilization,
+  };
 }
 
 function hrTimeToMs(hr: [number, number]): number {
@@ -228,6 +264,7 @@ function mergeTrace(
       conversationId: span.conversationId,
       toolCallCount: countOf(isToolSpan(span)),
       ...rootContent(span),
+      ...contextFromSpan(span),
     };
   }
 
@@ -245,6 +282,7 @@ function mergeTrace(
     toolCallCount: existing.toolCallCount + countOf(isToolSpan(span)),
     // The root arrives last, since it cannot end before what it holds.
     ...rootContent(span),
+    ...mergeContext(existing, span),
   };
 }
 
@@ -268,8 +306,7 @@ function newSession(
     toolCallCount: countOf(isToolSpan(span)),
     request: previewFrom(stringAttr(span, INPUT_MESSAGES)),
     response: previewFrom(stringAttr(span, OUTPUT_MESSAGES)),
-    contextWindow: numberAttr(span, CONTEXT_WINDOW),
-    contextUsage: numberAttr(span, CONTEXT_USAGE_AFTER),
+    ...contextFromSpan(span),
   };
 }
 
@@ -304,9 +341,7 @@ function mergeSession(
     request: existing.request ?? previewFrom(stringAttr(span, INPUT_MESSAGES)),
     response:
       previewFrom(stringAttr(span, OUTPUT_MESSAGES)) ?? existing.response,
-    contextWindow: numberAttr(span, CONTEXT_WINDOW) ?? existing.contextWindow,
-    contextUsage:
-      numberAttr(span, CONTEXT_USAGE_AFTER) ?? existing.contextUsage,
+    ...mergeContext(existing, span),
   };
 }
 

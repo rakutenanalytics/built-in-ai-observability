@@ -74,6 +74,8 @@ export interface Exchange {
   context: Context;
   turns: number;
   toolCalls: number;
+  windowTokens?: number;
+  usageBefore?: number;
 }
 
 const overflowRecordedSpans = new WeakSet<Span>();
@@ -417,14 +419,19 @@ export interface ExchangeResult {
   /** The turn that ended the exchange, absent if it was abandoned. */
   output?: string | AssistantTurn;
   config: InstrumentationConfig;
+  windowTokens?: number;
+  usageBefore?: number;
+  usageAfter?: number;
 }
 
 /** Attributes known only once an exchange is over. */
 export function exchangeResultAttributes(result: ExchangeResult): Attributes {
-  const { exchange, output, config } = result;
+  const { exchange, output, config, windowTokens, usageBefore, usageAfter } =
+    result;
   const attributes: Attributes = {
     [WEB_AI.EXCHANGE_TURN_COUNT]: exchange.turns,
     [WEB_AI.EXCHANGE_TOOL_CALL_COUNT]: exchange.toolCalls,
+    ...contextAttributes(windowTokens, usageBefore, usageAfter),
   };
 
   if (output === undefined) {
