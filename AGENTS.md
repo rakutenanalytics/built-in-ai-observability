@@ -23,12 +23,15 @@ pnpm install          # install all workspace deps
 pnpm build            # build all packages and apps
 pnpm typecheck        # tsc --noEmit across the monorepo
 pnpm test             # vitest in packages that define tests
-pnpm check            # biome lint + format check
-pnpm format           # auto-fix lint and formatting
+pnpm check            # biome lint + format check (full repo)
+pnpm format           # auto-fix lint and formatting (full repo)
+pnpm precommit        # run git pre-commit hook manually (Lefthook → Biome on staged files)
 pnpm dev              # watch mode (packages)
 ```
 
 Run all commands from the repository root unless working inside a single package.
+
+Git **pre-commit** hooks (via [Lefthook](https://lefthook.dev/)) run Biome on **staged** files — see `lefthook.yml`. Hooks install on `pnpm install` (`prepare` script). Run manually with `pnpm precommit`. Bypass only when intentional: `git commit --no-verify`.
 
 ## Dependency management
 
@@ -101,6 +104,7 @@ Review changes to `pnpm-workspace.yaml`, `pnpm-lock.yaml`, and any resolved cata
 
 - `minimumReleaseAge: 0` — allow freshly published packages (early-stage repo)
 - `allowBuilds.esbuild: true` — required for Vite native binaries
+- `allowBuilds.lefthook: true` — required for Lefthook’s postinstall binary download
 - `catalog:` — shared dependency versions (see above)
 
 ### 5. Add a new shared dependency

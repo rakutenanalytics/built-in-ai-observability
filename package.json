@@ -15,6 +15,8 @@
     "dev:vanilla": "turbo run dev --filter=@web-ai-otel/example-vanilla",
     "format": "biome check --write .",
     "mlflow": "uvx mlflow server",
+    "precommit": "lefthook run pre-commit",
+    "prepare": "lefthook install --reset-hooks-path",
     "test": "turbo run test",
     "typecheck": "turbo run typecheck"
   },
@@ -22,6 +24,7 @@
     "@biomejs/biome": "catalog:",
     "@types/chrome": "catalog:",
     "@types/node": "catalog:",
+    "lefthook": "catalog:",
     "tsdown": "catalog:",
     "turbo": "catalog:",
     "typescript": "catalog:",

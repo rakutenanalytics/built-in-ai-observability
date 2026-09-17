@@ -200,8 +200,8 @@ pnpm dev        # watch mode (packages)
 pnpm build      # build all packages
 pnpm test       # run tests
 pnpm typecheck  # tsc across every package and app
-pnpm check      # lint + format check
-pnpm format     # auto-fix lint and formatting
+pnpm check      # lint + format check (full repo)
+pnpm format     # auto-fix lint and formatting (full repo)
 
 # Apps and examples
 pnpm dev:playground
@@ -210,6 +210,8 @@ pnpm dev:extension
 pnpm build:extension
 pnpm mlflow     # local MLflow server for trace viewing
 ```
+
+Pre-commit hooks ([Lefthook](https://lefthook.dev/)) run Biome on **staged** files automatically after `pnpm install`. Run the hook manually with `pnpm precommit`; check the full repo with `pnpm check`. For emergencies: `git commit --no-verify`.
 
 Lint rules come from [Ultracite](https://github.com/haydenbleasel/ultracite) via `biome.jsonc`, but the scripts call Biome directly because `ultracite check` currently fails to render diagnostics.
 
