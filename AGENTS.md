@@ -4,6 +4,7 @@ Instructions for coding agents working on **built-in-ai-observability** — an O
 
 ## Project overview
 
+- **Node.js:** 22.18+, 24.11+, or 26+ at build time (see `engines` in root `package.json` and `.nvmrc`; required by `tsdown`)
 - **Package manager:** pnpm 12 (see `packageManager` in root `package.json`)
 - **Build orchestration:** Turborepo (`turbo run <task>`)
 - **Lint/format:** Biome via Ultracite rules (`biome.jsonc`)
@@ -99,7 +100,7 @@ Review changes to `pnpm-workspace.yaml`, `pnpm-lock.yaml`, and any resolved cata
 `pnpm-workspace.yaml` also configures:
 
 - `minimumReleaseAge: 0` — allow freshly published packages (early-stage repo)
-- `allowBuilds.esbuild: true` — required for Vite/tsup native binaries
+- `allowBuilds.esbuild: true` — required for Vite native binaries
 - `catalog:` — shared dependency versions (see above)
 
 ### 5. Add a new shared dependency
@@ -114,7 +115,7 @@ pnpm add some-package --filter @web-ai-otel/core
 # Then ensure the version in package.json is "catalog:" and the catalog entry exists
 ```
 
-**TypeScript 7** is not compatible with `tsup` DTS generation yet — keep `typescript` on latest **5.9.x** in the catalog until tsup catches up.
+Library packages use **tsdown** for bundling and DTS generation (TypeScript 7 compatible). Requires **Node.js 22.18+** at build time — the bundled output is not locked to that runtime.
 
 ### 6. Validate after every upgrade
 

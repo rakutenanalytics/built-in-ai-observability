@@ -59,7 +59,7 @@ OpenTelemetry is the canonical telemetry model. MLflow, Langfuse, Grafana, Phoen
 
 ### Prerequisites
 
-- Node.js 20+
+- Node.js 22.18+, 24.11+, or 26+ (required for `tsdown` builds; see `.nvmrc`)
 - pnpm 12+
 - Chrome with Prompt API support (for live testing)
 

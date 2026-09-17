@@ -22,11 +22,14 @@
     "@biomejs/biome": "catalog:",
     "@types/chrome": "catalog:",
     "@types/node": "catalog:",
-    "tsup": "catalog:",
+    "tsdown": "catalog:",
     "turbo": "catalog:",
     "typescript": "catalog:",
     "ultracite": "catalog:",
     "vitest": "catalog:"
   },
-  "packageManager": "pnpm@12.4.2"
+  "packageManager": "pnpm@12.4.2",
+  "engines": {
+    "node": "^22.18.0 || ^24.11.0 || >=26.0.0"
+  }
 }

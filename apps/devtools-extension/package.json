@@ -3,9 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "description": "Chrome DevTools extension for zero-code Web AI tracing",
+  "type": "module",
   "scripts": {
-    "build": "tsup && node scripts/copy-static.mjs",
-    "dev": "tsup --watch",
+    "build": "tsdown",
+    "dev": "tsdown --watch",
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
