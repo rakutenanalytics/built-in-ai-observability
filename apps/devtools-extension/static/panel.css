@@ -99,7 +99,7 @@ header {
   gap: 6px;
 }
 
-/* The list owns the full width; trace detail arrives as an overlay instead. */
+/* Trace detail slides in from the right; the list stays visible underneath. */
 main {
   min-height: calc(100vh - 41px);
 }
@@ -228,13 +228,66 @@ main {
   opacity: 0.8;
 }
 
-.drawer {
+.drawer-backdrop {
+  --drawer-transition-duration: 260ms;
+  --drawer-transition-easing: cubic-bezier(0.22, 1, 0.36, 1);
+
   position: fixed;
   inset: 0;
   z-index: 10;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.drawer-backdrop.is-open {
+  visibility: visible;
+  pointer-events: auto;
+}
+
+/* Full-viewport dim; the sheet covers the right side as it slides in. */
+.drawer-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  padding: 0;
+  cursor: default;
+  background: color-mix(in srgb, CanvasText 40%, transparent);
+  border: 0;
+  opacity: 0;
+  transition: opacity var(--drawer-transition-duration)
+    var(--drawer-transition-easing);
+}
+
+.drawer-backdrop.is-open .drawer-scrim {
+  opacity: 1;
+}
+
+.drawer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
   display: flex;
   flex-direction: column;
+  width: min(85%, 720px);
+  min-width: min(85%, 280px);
   background: Canvas;
+  box-shadow: -6px 0 24px color-mix(in srgb, CanvasText 18%, transparent);
+  transform: translateX(100%);
+  transition: transform var(--drawer-transition-duration)
+    var(--drawer-transition-easing);
+}
+
+.drawer-backdrop.is-open .drawer {
+  transform: translateX(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drawer-scrim,
+  .drawer {
+    transition: none;
+  }
 }
 
 .drawer-header {

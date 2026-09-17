@@ -24,6 +24,12 @@ export interface TraceDrawer {
   refresh: (traces: TraceSummary[]) => void;
 }
 
+const CLOSE_ANIMATION_MS = 260;
+
+function prefersReducedMotion(): boolean {
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
 function traceSummaryLine(trace: TraceSummary): string {
   const parts = [
     formatDuration(trace.durationMs),
@@ -51,10 +57,8 @@ function traceMeta(trace: TraceSummary): HTMLElement {
 }
 
 /**
- * The trace detail as an overlay rather than a third column. Covering the
- * whole panel is deliberate: at side-docked DevTools widths, leaving part of
- * the list visible would squeeze the prompts and responses back into a ribbon,
- * which is the problem the overlay exists to solve.
+ * Trace detail as a right slide-in sheet over the list. The dimmed list peek
+ * signals master/detail navigation without squeezing prompts into a side column.
  */
 export function createTraceDrawer(
   host: HTMLElement,
@@ -64,13 +68,21 @@ export function createTraceDrawer(
   let index = -1;
   let renderedSpanCount = -1;
   let restoreFocusTo: HTMLElement | null = null;
+  let closeTimer: ReturnType<typeof setTimeout> | undefined;
 
-  const element = el("div", "drawer");
-  element.setAttribute("role", "dialog");
-  element.setAttribute("aria-modal", "true");
-  element.setAttribute("aria-label", "Trace detail");
-  element.tabIndex = -1;
-  element.hidden = true;
+  const backdrop = el("div", "drawer-backdrop");
+  backdrop.hidden = true;
+
+  const scrim = document.createElement("button");
+  scrim.type = "button";
+  scrim.className = "drawer-scrim";
+  scrim.setAttribute("aria-label", "Close trace detail");
+
+  const panel = el("div", "drawer");
+  panel.setAttribute("role", "dialog");
+  panel.setAttribute("aria-modal", "true");
+  panel.setAttribute("aria-label", "Trace detail");
+  panel.tabIndex = -1;
 
   const previous = iconButton("←", "Previous trace");
   const next = iconButton("→", "Next trace");
@@ -83,8 +95,9 @@ export function createTraceDrawer(
   nav.append(previous, next);
   const header = el("div", "drawer-header");
   header.append(nav, title, summary, close);
-  element.append(header, body);
-  host.append(element);
+  panel.append(header, body);
+  backdrop.append(scrim, panel);
+  host.append(backdrop);
 
   function onKeyDown(event: KeyboardEvent): void {
     if (event.key === "Escape") {
@@ -93,14 +106,42 @@ export function createTraceDrawer(
     }
   }
 
-  function closeDrawer(): void {
-    element.hidden = true;
+  function finishClose(): void {
+    if (closeTimer !== undefined) {
+      clearTimeout(closeTimer);
+      closeTimer = undefined;
+    }
+    backdrop.hidden = true;
+    backdrop.classList.remove("is-open");
     index = -1;
     renderedSpanCount = -1;
     body.replaceChildren();
     document.removeEventListener("keydown", onKeyDown);
     restoreFocusTo?.focus();
     restoreFocusTo = null;
+  }
+
+  function closeDrawer(): void {
+    if (backdrop.hidden) {
+      return;
+    }
+    backdrop.classList.remove("is-open");
+    if (prefersReducedMotion()) {
+      finishClose();
+      return;
+    }
+    closeTimer = setTimeout(finishClose, CLOSE_ANIMATION_MS);
+  }
+
+  function openBackdrop(): void {
+    backdrop.hidden = false;
+    if (prefersReducedMotion()) {
+      backdrop.classList.add("is-open");
+      return;
+    }
+    requestAnimationFrame(() => {
+      backdrop.classList.add("is-open");
+    });
   }
 
   function render(trace: TraceSummary): void {
@@ -135,24 +176,30 @@ export function createTraceDrawer(
   previous.addEventListener("click", () => show(index - 1));
   next.addEventListener("click", () => show(index + 1));
   close.addEventListener("click", closeDrawer);
+  scrim.addEventListener("click", closeDrawer);
 
   return {
     close: closeDrawer,
     open(nextTraces: TraceSummary[], nextIndex: number): void {
+      if (closeTimer !== undefined) {
+        clearTimeout(closeTimer);
+        closeTimer = undefined;
+      }
       traces = nextTraces;
-      if (element.hidden) {
+      const wasClosed = backdrop.hidden;
+      if (wasClosed) {
         restoreFocusTo = document.activeElement as HTMLElement | null;
         document.addEventListener("keydown", onKeyDown);
+        openBackdrop();
       }
-      element.hidden = false;
       show(nextIndex);
-      element.focus();
+      panel.focus();
     },
     openTraceId(): string | undefined {
-      return element.hidden ? undefined : traces[index]?.traceId;
+      return backdrop.hidden ? undefined : traces[index]?.traceId;
     },
     refresh(nextTraces: TraceSummary[]): void {
-      if (element.hidden) {
+      if (backdrop.hidden) {
         traces = nextTraces;
         return;
       }
