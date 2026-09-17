@@ -1,3 +1,4 @@
+import { renderMarkdown } from "./markdown/render-dom.js";
 import type {
   IoPayload,
   IoView,
@@ -66,7 +67,7 @@ function renderMessageCard(message: PrettyMessage): HTMLElement {
   }
 
   if (message.text) {
-    card.append(el("div", "message-content", message.text));
+    card.append(renderMarkdown(message.text));
   }
   if (message.fields) {
     card.append(renderFields(message.fields));

@@ -655,7 +655,113 @@ main {
 .message-content {
   font-size: 12px;
   word-break: break-word;
+}
+
+.message-content.markdown {
+  display: grid;
+  gap: 0.5em;
+}
+
+.message-content.markdown p,
+.message-content.markdown pre,
+.message-content.markdown ul,
+.message-content.markdown ol,
+.message-content.markdown hr,
+.message-content.markdown h1,
+.message-content.markdown h2,
+.message-content.markdown h3,
+.message-content.markdown h4,
+.message-content.markdown h5,
+.message-content.markdown h6 {
+  margin: 0;
+}
+
+.message-content.markdown h1 {
+  font-size: 1.15em;
+}
+
+.message-content.markdown h2 {
+  font-size: 1.05em;
+}
+
+.message-content.markdown h3 {
+  font-size: 1em;
+}
+
+.message-content.markdown h4 {
+  font-size: 0.95em;
+}
+
+.message-content.markdown h5 {
+  font-size: 0.9em;
+}
+
+.message-content.markdown h6 {
+  font-size: 0.85em;
+  opacity: 0.9;
+}
+
+.message-content.markdown hr {
+  border: 0;
+  border-top: 1px solid color-mix(in srgb, CanvasText 20%, transparent);
+}
+
+.message-content.markdown ul,
+.message-content.markdown ol {
+  padding-left: 1.4em;
+}
+
+.message-content.markdown pre {
+  padding: 8px;
+  overflow-x: auto;
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
   white-space: pre-wrap;
+  background: color-mix(in srgb, CanvasText 4%, transparent);
+  border-radius: 4px;
+}
+
+.message-content.markdown code {
+  padding: 0.1em 0.3em;
+  font-family: ui-monospace, monospace;
+  font-size: 0.95em;
+  background: color-mix(in srgb, CanvasText 6%, transparent);
+  border-radius: 3px;
+}
+
+.message-content.markdown pre code {
+  padding: 0;
+  font-family: inherit;
+  font-size: inherit;
+  background: none;
+}
+
+.message-content.markdown a {
+  color: LinkText;
+  text-decoration: underline;
+}
+
+.message-content.markdown .table-wrap {
+  overflow-x: auto;
+}
+
+.message-content.markdown table {
+  width: 100%;
+  font-size: 12px;
+  border-collapse: collapse;
+}
+
+.message-content.markdown th,
+.message-content.markdown td {
+  padding: 4px 8px;
+  vertical-align: top;
+  text-align: left;
+  border: 1px solid color-mix(in srgb, CanvasText 18%, transparent);
+}
+
+.message-content.markdown th {
+  font-weight: 600;
+  background: color-mix(in srgb, CanvasText 5%, transparent);
 }
 
 .role-assistant .message-role {
