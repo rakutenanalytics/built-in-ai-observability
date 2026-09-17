@@ -60,7 +60,7 @@ OpenTelemetry is the canonical telemetry model. MLflow, Langfuse, Grafana, Phoen
 ### Prerequisites
 
 - Node.js 20+
-- pnpm 10+
+- pnpm 12+
 - Chrome with Prompt API support (for live testing)
 
 ### Install
@@ -94,7 +94,7 @@ See `examples/vanilla/` for a minimal app.
 ### DevTools extension
 
 ```bash
-pnpm --filter @web-ai-otel/devtools-extension build
+pnpm build:extension
 ```
 
 Load `apps/devtools-extension/dist` as an unpacked extension in Chrome. Open DevTools on any page using the Prompt API and select the **AI Traces** panel.
@@ -108,7 +108,7 @@ The injected provider is deliberately **not** registered as the page's global Op
 ### Playground
 
 ```bash
-pnpm --filter @web-ai-otel/playground dev
+pnpm dev:playground
 ```
 
 - Default: SDK mode, exporting OTLP to a collector on `localhost:4318`
@@ -116,7 +116,7 @@ pnpm --filter @web-ai-otel/playground dev
 - MLflow: `?experiment=<id>` exports to a local MLflow instead, which ingests OTLP directly and renders the traces from the attributes we already emit. `?otlp=<url>` points anywhere else.
 
 ```bash
-uvx mlflow server   # http://localhost:5000, then open ?experiment=0
+pnpm mlflow   # http://localhost:5000, then open ?experiment=0
 ```
 
 ## Packages
@@ -202,6 +202,13 @@ pnpm test       # run tests
 pnpm typecheck  # tsc across every package and app
 pnpm check      # lint + format check
 pnpm format     # auto-fix lint and formatting
+
+# Apps and examples
+pnpm dev:playground
+pnpm dev:vanilla
+pnpm dev:extension
+pnpm build:extension
+pnpm mlflow     # local MLflow server for trace viewing
 ```
 
 Lint rules come from [Ultracite](https://github.com/haydenbleasel/ultracite) via `biome.jsonc`, but the scripts call Biome directly because `ultracite check` currently fails to render diagnostics.

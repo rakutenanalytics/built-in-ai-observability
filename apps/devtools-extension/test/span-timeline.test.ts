@@ -18,25 +18,25 @@ function span(overrides: {
   durationMs: number;
 }): StoredSpan {
   return {
-    protocolVersion: 1,
-    traceId: "trace-1",
-    spanId: overrides.spanId,
-    parentSpanId: overrides.parentSpanId,
-    name: overrides.name ?? overrides.spanId,
-    kind: 0,
-    startTime: hr(overrides.startMs),
-    endTime: hr(overrides.startMs + overrides.durationMs),
     attributes: {},
-    events: [],
-    status: { code: 1 },
-    source: {
-      tabId: 1,
-      frameId: 0,
-      url: "https://a.test/",
-      origin: "https://a.test",
-    },
-    startTimeMs: overrides.startMs,
     durationMs: overrides.durationMs,
+    endTime: hr(overrides.startMs + overrides.durationMs),
+    events: [],
+    kind: 0,
+    name: overrides.name ?? overrides.spanId,
+    parentSpanId: overrides.parentSpanId,
+    protocolVersion: 1,
+    source: {
+      frameId: 0,
+      origin: "https://a.test",
+      tabId: 1,
+      url: "https://a.test/",
+    },
+    spanId: overrides.spanId,
+    startTime: hr(overrides.startMs),
+    startTimeMs: overrides.startMs,
+    status: { code: 1 },
+    traceId: "trace-1",
   };
 }
 
@@ -47,12 +47,12 @@ function layoutOf(spans: StoredSpan[]) {
 describe("timelineLayout", () => {
   it("places bars proportionally within the trace window", () => {
     const spans = [
-      span({ spanId: "root", startMs: 1000, durationMs: 400 }),
+      span({ durationMs: 400, spanId: "root", startMs: 1000 }),
       span({
-        spanId: "child",
-        parentSpanId: "root",
-        startMs: 1200,
         durationMs: 200,
+        parentSpanId: "root",
+        spanId: "child",
+        startMs: 1200,
       }),
     ];
 
@@ -66,24 +66,24 @@ describe("timelineLayout", () => {
 
   it("orders siblings by start time and nests their children", () => {
     const spans = [
-      span({ spanId: "root", startMs: 0, durationMs: 100 }),
+      span({ durationMs: 100, spanId: "root", startMs: 0 }),
       span({
+        durationMs: 10,
+        parentSpanId: "root",
         spanId: "late",
-        parentSpanId: "root",
         startMs: 60,
-        durationMs: 10,
       }),
       span({
-        spanId: "early",
+        durationMs: 10,
         parentSpanId: "root",
+        spanId: "early",
         startMs: 10,
-        durationMs: 10,
       }),
       span({
-        spanId: "leaf",
-        parentSpanId: "early",
-        startMs: 12,
         durationMs: 2,
+        parentSpanId: "early",
+        spanId: "leaf",
+        startMs: 12,
       }),
     ];
 
@@ -100,12 +100,12 @@ describe("timelineLayout", () => {
   /** A tool call that resolves synchronously still needs a place on the axis. */
   it("keeps a zero-duration span positioned where it happened", () => {
     const spans = [
-      span({ spanId: "root", startMs: 0, durationMs: 200 }),
+      span({ durationMs: 200, spanId: "root", startMs: 0 }),
       span({
-        spanId: "tool",
-        parentSpanId: "root",
-        startMs: 150,
         durationMs: 0,
+        parentSpanId: "root",
+        spanId: "tool",
+        startMs: 150,
       }),
     ];
 
@@ -116,12 +116,12 @@ describe("timelineLayout", () => {
 
   it("treats a span reaching past its parent as the window end", () => {
     const spans = [
-      span({ spanId: "root", startMs: 0, durationMs: 50 }),
+      span({ durationMs: 50, spanId: "root", startMs: 0 }),
       span({
-        spanId: "child",
-        parentSpanId: "root",
-        startMs: 25,
         durationMs: 75,
+        parentSpanId: "root",
+        spanId: "child",
+        startMs: 25,
       }),
     ];
 
@@ -136,7 +136,7 @@ describe("timelineLayout", () => {
     expect(layoutOf([])).toEqual({ rows: [], totalMs: 0 });
 
     const { rows, totalMs } = layoutOf([
-      span({ spanId: "only", startMs: 500, durationMs: 0 }),
+      span({ durationMs: 0, spanId: "only", startMs: 500 }),
     ]);
     expect(totalMs).toBe(0);
     expect(rows[0]).toMatchObject({ offsetPct: 0, widthPct: 0 });

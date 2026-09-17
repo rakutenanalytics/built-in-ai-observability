@@ -29,7 +29,7 @@ function safeJson(value: unknown, maxLength: number): string | undefined {
   try {
     return truncateAttribute(JSON.stringify(value), maxLength);
   } catch {
-    return;
+    // Tool arguments are not always JSON.
   }
 }
 
@@ -64,9 +64,9 @@ export function registerToolCalls(
     state.pendingCalls.push({
       ...identified,
       index: state.toolCallSeq,
-      turnIndex: state.turnIndex,
-      runnableAt,
       parent,
+      runnableAt,
+      turnIndex: state.turnIndex,
     });
     return identified;
   });
@@ -148,15 +148,15 @@ function toolSpanAttributes(
 }
 
 export interface ToolSpanOptions {
-  tracer: Tracer;
-  state: SessionState;
-  responses: ToolResponseInfo[];
   config: InstrumentationConfig;
-  providerName: string;
-  /** Used when no pending call matches, so the span still joins the trace. */
-  fallbackParent: Context;
   /** Where every span ends: the instant the turn consuming them begins. */
   endTime: number;
+  /** Used when no pending call matches, so the span still joins the trace. */
+  fallbackParent: Context;
+  providerName: string;
+  responses: ToolResponseInfo[];
+  state: SessionState;
+  tracer: Tracer;
 }
 
 /**
@@ -185,10 +185,6 @@ export function emitToolExecutionSpans(options: ToolSpanOptions): void {
     const span = tracer.startSpan(
       `${OPERATION_EXECUTE_TOOL} ${name}`,
       {
-        kind: SpanKind.INTERNAL,
-        // An unmatched response has no known start, so it collapses onto the
-        // moment it arrived rather than borrowing another call's clock.
-        startTime: pending?.runnableAt ?? endTime,
         attributes: toolSpanAttributes(
           state,
           response,
@@ -196,6 +192,10 @@ export function emitToolExecutionSpans(options: ToolSpanOptions): void {
           config,
           providerName
         ),
+        kind: SpanKind.INTERNAL,
+        // An unmatched response has no known start, so it collapses onto the
+        // moment it arrived rather than borrowing another call's clock.
+        startTime: pending?.runnableAt ?? endTime,
       },
       pending?.parent ?? fallbackParent
     );

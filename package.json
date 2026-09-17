@@ -3,13 +3,19 @@
   "private": true,
   "description": "OpenTelemetry instrumentation for Web AI APIs",
   "license": "Apache-2.0",
-  "packageManager": "pnpm@10.12.1",
   "scripts": {
     "build": "turbo run build",
-    "dev": "turbo run dev",
-    "test": "turbo run test",
+    "build:extension": "turbo run build --filter=@web-ai-otel/devtools-extension",
+    "build:playground": "turbo run build --filter=@web-ai-otel/playground",
+    "build:vanilla": "turbo run build --filter=@web-ai-otel/example-vanilla",
     "check": "biome check .",
+    "dev": "turbo run dev",
+    "dev:extension": "turbo run dev --filter=@web-ai-otel/devtools-extension",
+    "dev:playground": "turbo run dev --filter=@web-ai-otel/playground",
+    "dev:vanilla": "turbo run dev --filter=@web-ai-otel/example-vanilla",
     "format": "biome check --write .",
+    "mlflow": "uvx mlflow server",
+    "test": "turbo run test",
     "typecheck": "turbo run typecheck"
   },
   "devDependencies": {
@@ -21,5 +27,6 @@
     "typescript": "catalog:",
     "ultracite": "catalog:",
     "vitest": "catalog:"
-  }
+  },
+  "packageManager": "pnpm@12.4.2"
 }

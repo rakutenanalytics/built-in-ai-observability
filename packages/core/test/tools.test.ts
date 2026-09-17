@@ -22,17 +22,17 @@ function onPrototype<T>(fields: Record<string, unknown>): T {
 
 const weatherCall = () =>
   onPrototype<unknown>({
+    arguments: { city: "Tokyo" },
     callID: "",
     name: "get_weather",
-    arguments: { city: "Tokyo" },
   });
 
 describe("readToolCall", () => {
   it("reads fields held on the prototype", () => {
     expect(readToolCall(weatherCall())).toEqual({
+      arguments: { city: "Tokyo" },
       id: "",
       name: "get_weather",
-      arguments: { city: "Tokyo" },
     });
   });
 
@@ -66,8 +66,8 @@ describe("readToolResponse", () => {
   it("reads a failure and reports no result", () => {
     const failure = onPrototype<unknown>({
       callID: "",
-      name: "get_weather",
       errorMessage: 'missing "city"',
+      name: "get_weather",
     });
 
     const response = readToolResponse(failure);
@@ -97,7 +97,7 @@ describe("toolTrafficFrom", () => {
     });
 
     const traffic = toolTrafficFrom([
-      { role: "user", content: [{ type: "tool-response", value: response }] },
+      { content: [{ type: "tool-response", value: response }], role: "user" },
     ]);
 
     expect(traffic.responses).toHaveLength(1);
@@ -150,33 +150,33 @@ describe("tool message encoding", () => {
 
     const [message] = encodeInputMessages([
       {
-        role: "user",
         content: [{ type: "tool-response", value: response }],
+        role: "user",
       },
     ] as never);
 
     expect(message?.parts[0]).toEqual({
-      type: "tool_call_response",
       name: "get_weather",
       response: [{ type: "object", value: { tempC: 24 } }],
+      type: "tool_call_response",
     });
   });
 
   it("encodes a tool failure as an error rather than a response", () => {
     const failure = onPrototype<unknown>({
       callID: "",
-      name: "get_weather",
       errorMessage: "boom",
+      name: "get_weather",
     });
 
     const [message] = encodeInputMessages([
-      { role: "user", content: [{ type: "tool-response", value: failure }] },
+      { content: [{ type: "tool-response", value: failure }], role: "user" },
     ] as never);
 
     expect(message?.parts[0]).toEqual({
-      type: "tool_call_response",
-      name: "get_weather",
       error: "boom",
+      name: "get_weather",
+      type: "tool_call_response",
     });
   });
 
@@ -185,7 +185,7 @@ describe("tool message encoding", () => {
       {
         text: "Checking.",
         toolCalls: [
-          { id: "", name: "get_weather", arguments: { city: "Tokyo" } },
+          { arguments: { city: "Tokyo" }, id: "", name: "get_weather" },
         ],
       },
       "tool_call"
@@ -193,8 +193,8 @@ describe("tool message encoding", () => {
 
     expect(message?.finish_reason).toBe("tool_call");
     expect(message?.parts).toEqual([
-      { type: "text", content: "Checking." },
-      { type: "tool_call", name: "get_weather", arguments: { city: "Tokyo" } },
+      { content: "Checking.", type: "text" },
+      { arguments: { city: "Tokyo" }, name: "get_weather", type: "tool_call" },
     ]);
   });
 
@@ -205,12 +205,12 @@ describe("tool message encoding", () => {
     );
 
     expect(message?.parts).toEqual([
-      { type: "tool_call", name: "get_weather" },
+      { name: "get_weather", type: "tool_call" },
     ]);
   });
 
   it("still encodes a plain string turn as one text part", () => {
     const [message] = encodeOutputMessages("hello", "stop");
-    expect(message?.parts).toEqual([{ type: "text", content: "hello" }]);
+    expect(message?.parts).toEqual([{ content: "hello", type: "text" }]);
   });
 });

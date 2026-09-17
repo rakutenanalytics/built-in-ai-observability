@@ -78,9 +78,9 @@ function toolCall(
   callID = ""
 ): LanguageModelToolCall {
   return Object.create({
+    arguments: args,
     callID,
     name,
-    arguments: args,
   }) as LanguageModelToolCall;
 }
 
@@ -103,8 +103,8 @@ function toolError(
 ): LanguageModelToolError {
   return Object.create({
     callID,
-    name,
     errorMessage,
+    name,
   }) as LanguageModelToolError;
 }
 
@@ -124,29 +124,31 @@ function toolResponseTurn(
   ...responses: LanguageModelToolResponse[]
 ): LanguageModelMessage[] {
   // Tool responses travel as user content: there is no `tool` role.
-  return [{ role: "user", content: responses.map(toolResponseChunk) }];
+  return [{ content: responses.map(toolResponseChunk), role: "user" }];
 }
 
 const WEATHER_TOOL: LanguageModelToolDeclaration = {
-  name: "get_weather",
   description: "Get the current weather for a city.",
   inputSchema: {
-    type: "object",
     properties: { city: { type: "string" } },
     required: ["city"],
+    type: "object",
   },
+  name: "get_weather",
 };
 
 function createMockSession(overrides: MockSessionOverrides = {}) {
   const listeners = new Map<string, Set<() => void>>();
   const session = {
-    contextWindow: CONTEXT_WINDOW,
-    contextUsage: 100,
     addEventListener: (type: string, fn: () => void) => {
       const set = listeners.get(type) ?? new Set();
       set.add(fn);
       listeners.set(type, set);
     },
+    clone: vi.fn(() => Promise.resolve(createMockSession())),
+    contextUsage: 100,
+    contextWindow: CONTEXT_WINDOW,
+    destroy: vi.fn(),
     /** Test hook: fire a session event such as "contextoverflow". */
     emit: (type: string) => {
       for (const fn of listeners.get(type) ?? []) {
@@ -161,8 +163,6 @@ function createMockSession(overrides: MockSessionOverrides = {}) {
       (input: LanguageModelPrompt): ReadableStream<LanguageModelStreamChunk> =>
         streamOf(["stream:", String(input)])
     ),
-    destroy: vi.fn(),
-    clone: vi.fn(() => Promise.resolve(createMockSession())),
     ...overrides,
   };
   return session;
@@ -201,9 +201,9 @@ describe("PromptApiInstrumentation", () => {
 
   const setup = (options: PromptInstrumentationOptions = {}) => {
     instrumentation = new PromptApiInstrumentation({
-      tracerProvider: provider as unknown as TracerProvider,
       captureInput: true,
       captureOutput: true,
+      tracerProvider: provider as unknown as TracerProvider,
       ...options,
     });
     instrumentation.enable();
@@ -218,8 +218,8 @@ describe("PromptApiInstrumentation", () => {
     mockSession = createMockSession();
     createSpy = vi.fn(() => Promise.resolve(mockSession));
     (globalThis as Record<string, unknown>).LanguageModel = {
-      create: createSpy,
       availability: vi.fn(() => Promise.resolve("available")),
+      create: createSpy,
     };
     originalCreate = LanguageModel.create;
     setup();
@@ -233,7 +233,7 @@ describe("PromptApiInstrumentation", () => {
 
   it("instruments create and prompt", async () => {
     const session = await LanguageModel.create({
-      expectedInputs: [{ type: "text", languages: ["en"] }],
+      expectedInputs: [{ languages: ["en"], type: "text" }],
     });
     await expect(session.prompt("hello")).resolves.toBe("reply:hello");
 
@@ -303,11 +303,11 @@ describe("PromptApiInstrumentation", () => {
     const session = await LanguageModel.create();
     await session.prompt([
       {
-        role: "user",
         content: [
           { type: "text", value: "describe" },
           { type: "image", value: "binary-blob" },
         ],
+        role: "user",
       },
     ]);
 
@@ -563,8 +563,8 @@ describe("PromptApiInstrumentation", () => {
       const [first, second] = turnSpans();
       const asked = JSON.parse(String(first?.attributes["mlflow.spanOutputs"]));
       expect(asked.messages[0].tool_calls[0].function).toEqual({
-        name: "get_weather",
         arguments: '{"city":"Kyoto"}',
+        name: "get_weather",
       });
 
       const answered = JSON.parse(

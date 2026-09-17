@@ -37,8 +37,8 @@ async function request<T extends PanelRequest["type"]>(
 
 async function loadSpans(trace: TraceSummary): Promise<StoredSpan[]> {
   const { spans } = await request({
-    type: "get-trace-spans",
     traceId: trace.traceId,
+    type: "get-trace-spans",
   });
   return spans ?? [];
 }
@@ -72,8 +72,8 @@ async function load(): Promise<void> {
   }
 
   const { traces } = await request({
-    type: "list-traces",
     tabId: inspectedTabId,
+    type: "list-traces",
   });
   const list = traces ?? [];
 
@@ -87,15 +87,15 @@ async function load(): Promise<void> {
   let rendered: TraceListRender;
   if (groupBySession) {
     const { sessions } = await request({
-      type: "list-sessions",
       tabId: inspectedTabId,
+      type: "list-sessions",
     });
     rendered = renderGroupedList(list, sessions ?? [], openTrace);
   } else {
     rendered = renderFlatList(list, openTrace);
   }
 
-  order = rendered.order;
+  ({ order } = rendered);
   listEl.replaceChildren(...rendered.rows);
   drawer.refresh(order);
   markOpenTrace();
@@ -141,7 +141,7 @@ document.getElementById("refresh")?.addEventListener("click", () => {
 
 document.getElementById("clear")?.addEventListener("click", () => {
   (async () => {
-    await request({ type: "clear-traces", tabId: inspectedTabId });
+    await request({ tabId: inspectedTabId, type: "clear-traces" });
     drawer.close();
     await load();
   })().catch(console.error);
@@ -150,8 +150,8 @@ document.getElementById("clear")?.addEventListener("click", () => {
 document.getElementById("export")?.addEventListener("click", () => {
   (async () => {
     const { spans } = await request({
-      type: "export-traces",
       tabId: inspectedTabId,
+      type: "export-traces",
     });
     const blob = new Blob([JSON.stringify(spans ?? [], null, 2)], {
       type: "application/json",
@@ -168,7 +168,7 @@ document.getElementById("export")?.addEventListener("click", () => {
 
 chrome.runtime.onMessage.addListener((message) => {
   const msg = message as { type?: string; tabId?: number };
-  if (msg?.type !== TRACES_UPDATED) {
+  if (msg.type !== TRACES_UPDATED) {
     return;
   }
   if (msg.tabId !== undefined && msg.tabId !== inspectedTabId) {

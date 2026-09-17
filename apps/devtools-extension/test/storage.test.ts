@@ -32,7 +32,7 @@ function hr(ms: number): [number, number] {
 }
 
 function encodeMessages(role: string, content: string): string {
-  return JSON.stringify([{ role, parts: [{ type: "text", content }] }]);
+  return JSON.stringify([{ parts: [{ content, type: "text" }], role }]);
 }
 
 function span(overrides: {
@@ -48,36 +48,36 @@ function span(overrides: {
 }): SerializedSpan {
   const startMs = overrides.startMs ?? 1000;
   return {
-    protocolVersion: 1,
-    traceId: overrides.traceId,
-    spanId: overrides.spanId,
-    parentSpanId: overrides.parentSpanId,
-    name: overrides.name,
-    kind: 0,
-    startTime: hr(startMs),
-    endTime: hr(overrides.endMs ?? startMs + 10),
     attributes: {
       ...(overrides.conversationId
         ? { "gen_ai.conversation.id": overrides.conversationId }
         : {}),
       ...overrides.attributes,
     },
+    endTime: hr(overrides.endMs ?? startMs + 10),
     events: [],
+    kind: 0,
+    name: overrides.name,
+    parentSpanId: overrides.parentSpanId,
+    protocolVersion: 1,
+    spanId: overrides.spanId,
+    startTime: hr(startMs),
     status: { code: overrides.statusCode ?? OK },
+    traceId: overrides.traceId,
   };
 }
 
 const TAB_A: SpanSource = {
-  tabId: 1,
   frameId: 0,
-  url: "https://a.test/app",
   origin: "https://a.test",
+  tabId: 1,
+  url: "https://a.test/app",
 };
 const TAB_B: SpanSource = {
-  tabId: 2,
   frameId: 0,
-  url: "https://b.test/app",
   origin: "https://b.test",
+  tabId: 2,
+  url: "https://b.test/app",
 };
 
 const CONVERSATION = "conv-1";
@@ -90,71 +90,71 @@ describe("devtools trace storage", () => {
   it("summarizes a trace and a session from a single span", async () => {
     await storage.storeSpan(
       span({
+        attributes: { "web_ai.context.window_tokens": 9216 },
+        conversationId: CONVERSATION,
+        endMs: 5040,
         name: "web_ai.create_session",
-        traceId: "t1",
         spanId: "s1",
         startMs: 5000,
-        endMs: 5040,
-        conversationId: CONVERSATION,
-        attributes: { "web_ai.context.window_tokens": 9216 },
+        traceId: "t1",
       }),
       TAB_A
     );
 
     const [trace] = await storage.listTraces({});
     expect(trace).toMatchObject({
-      traceId: "t1",
+      contextWindow: 9216,
+      conversationId: CONVERSATION,
+      origin: "https://a.test",
       rootSpanName: "web_ai.create_session",
       spanCount: 1,
-      origin: "https://a.test",
       tabId: 1,
-      conversationId: CONVERSATION,
-      contextWindow: 9216,
+      traceId: "t1",
     });
     expect(trace.durationMs).toBeCloseTo(40);
 
     const [session] = await storage.listSessions({});
     expect(session).toMatchObject({
-      conversationId: CONVERSATION,
-      traceIds: ["t1"],
-      spanCount: 1,
-      turnCount: 0,
-      errorCount: 0,
       contextWindow: 9216,
+      conversationId: CONVERSATION,
+      errorCount: 0,
+      spanCount: 1,
       tabId: 1,
+      traceIds: ["t1"],
+      turnCount: 0,
     });
   });
 
   it("tracks the latest context utilization on traces and sessions", async () => {
     await storage.storeSpan(
       span({
-        name: "generate_content",
-        traceId: "t1",
-        spanId: "s1",
-        startMs: 1000,
-        endMs: 1100,
-        conversationId: CONVERSATION,
         attributes: {
-          "web_ai.context.window_tokens": 1000,
           "web_ai.context.usage_after_tokens": 200,
           "web_ai.context.utilization_after": 0.2,
+          "web_ai.context.window_tokens": 1000,
         },
+        conversationId: CONVERSATION,
+        endMs: 1100,
+        name: "generate_content",
+        spanId: "s1",
+        startMs: 1000,
+        traceId: "t1",
       }),
       TAB_A
     );
     await storage.storeSpan(
       span({
-        name: "generate_content",
-        traceId: "t1",
-        spanId: "s2",
-        startMs: 1200,
-        endMs: 1300,
-        conversationId: CONVERSATION,
         attributes: {
-          "web_ai.context.window_tokens": 1000,
           "web_ai.context.usage_after_tokens": 450,
           "web_ai.context.utilization_after": 0.45,
+          "web_ai.context.window_tokens": 1000,
         },
+        conversationId: CONVERSATION,
+        endMs: 1300,
+        name: "generate_content",
+        spanId: "s2",
+        startMs: 1200,
+        traceId: "t1",
       }),
       TAB_A
     );
@@ -162,46 +162,46 @@ describe("devtools trace storage", () => {
     const [trace] = await storage.listTraces({});
     const [session] = await storage.listSessions({});
     expect(trace).toMatchObject({
-      contextWindow: 1000,
       contextUsage: 450,
       contextUtilization: 0.45,
+      contextWindow: 1000,
     });
     expect(session).toMatchObject({
-      contextWindow: 1000,
       contextUsage: 450,
       contextUtilization: 0.45,
+      contextWindow: 1000,
     });
   });
 
   it("groups separate traces sharing a conversation id into one session", async () => {
     await storage.storeSpan(
       span({
+        conversationId: CONVERSATION,
         name: "web_ai.create_session",
-        traceId: "t1",
         spanId: "s1",
         startMs: 1000,
-        conversationId: CONVERSATION,
+        traceId: "t1",
       }),
       TAB_A
     );
     await storage.storeSpan(
       span({
+        conversationId: CONVERSATION,
         name: "generate_content",
-        traceId: "t2",
         spanId: "s2",
         startMs: 2000,
-        conversationId: CONVERSATION,
+        traceId: "t2",
       }),
       TAB_A
     );
     await storage.storeSpan(
       span({
+        conversationId: CONVERSATION,
+        endMs: 3500,
         name: "generate_content",
-        traceId: "t3",
         spanId: "s3",
         startMs: 3000,
-        endMs: 3500,
-        conversationId: CONVERSATION,
+        traceId: "t3",
       }),
       TAB_A
     );
@@ -212,8 +212,8 @@ describe("devtools trace storage", () => {
     expect(sessions).toHaveLength(1);
     expect(sessions[0]).toMatchObject({
       conversationId: CONVERSATION,
-      traceIds: ["t1", "t2", "t3"],
       spanCount: 3,
+      traceIds: ["t1", "t2", "t3"],
       turnCount: 2,
     });
     // Spans out of one conversation define the session's wall-clock extent.
@@ -227,31 +227,31 @@ describe("devtools trace storage", () => {
     // in the same trace because the second turn carried the tool response.
     const spans = [
       span({
+        attributes: { "gen_ai.operation.name": "generate_content" },
+        conversationId: CONVERSATION,
         name: "generate_content",
-        traceId: "t1",
         spanId: "s1",
         startMs: 1000,
-        conversationId: CONVERSATION,
-        attributes: { "gen_ai.operation.name": "generate_content" },
+        traceId: "t1",
       }),
       span({
-        name: "execute_tool get_weather",
-        traceId: "t1",
-        spanId: "s2",
-        startMs: 1010,
-        conversationId: CONVERSATION,
         attributes: {
           "gen_ai.operation.name": "execute_tool",
           "gen_ai.tool.name": "get_weather",
         },
+        conversationId: CONVERSATION,
+        name: "execute_tool get_weather",
+        spanId: "s2",
+        startMs: 1010,
+        traceId: "t1",
       }),
       span({
+        attributes: { "gen_ai.operation.name": "generate_content" },
+        conversationId: CONVERSATION,
         name: "generate_content",
-        traceId: "t1",
         spanId: "s3",
         startMs: 1020,
-        conversationId: CONVERSATION,
-        attributes: { "gen_ai.operation.name": "generate_content" },
+        traceId: "t1",
       }),
     ];
     for (const record of spans) {
@@ -262,50 +262,50 @@ describe("devtools trace storage", () => {
     expect(trace).toMatchObject({ spanCount: 3, toolCallCount: 1 });
 
     const [session] = await storage.listSessions({});
-    expect(session).toMatchObject({ turnCount: 2, toolCallCount: 1 });
+    expect(session).toMatchObject({ toolCallCount: 1, turnCount: 2 });
   });
 
   it("summarises a tool exchange by its root, not by its first turn", async () => {
     // The root arrives last: it cannot end before the turns it holds.
     const spans = [
       span({
-        name: "generate_content",
-        traceId: "t1",
-        spanId: "s2",
-        parentSpanId: "s1",
-        startMs: 1000,
-        conversationId: CONVERSATION,
         attributes: {
           "gen_ai.output.messages": encodeMessages(
             "assistant",
             "calling get_weather"
           ),
         },
-      }),
-      span({
-        name: "execute_tool get_weather",
-        traceId: "t1",
-        spanId: "s3",
+        conversationId: CONVERSATION,
+        name: "generate_content",
         parentSpanId: "s1",
-        startMs: 1010,
-        conversationId: CONVERSATION,
-        attributes: { "gen_ai.operation.name": "execute_tool" },
+        spanId: "s2",
+        startMs: 1000,
+        traceId: "t1",
       }),
       span({
-        name: "invoke_agent",
-        traceId: "t1",
-        spanId: "s1",
-        startMs: 1000,
-        endMs: 1100,
+        attributes: { "gen_ai.operation.name": "execute_tool" },
         conversationId: CONVERSATION,
+        name: "execute_tool get_weather",
+        parentSpanId: "s1",
+        spanId: "s3",
+        startMs: 1010,
+        traceId: "t1",
+      }),
+      span({
         attributes: {
-          "gen_ai.operation.name": "invoke_agent",
           "gen_ai.input.messages": encodeMessages("user", "weather in Kyoto?"),
+          "gen_ai.operation.name": "invoke_agent",
           "gen_ai.output.messages": encodeMessages(
             "assistant",
             "It is raining in Kyoto."
           ),
         },
+        conversationId: CONVERSATION,
+        endMs: 1100,
+        name: "invoke_agent",
+        spanId: "s1",
+        startMs: 1000,
+        traceId: "t1",
       }),
     ];
     for (const record of spans) {
@@ -314,9 +314,9 @@ describe("devtools trace storage", () => {
 
     const [trace] = await storage.listTraces({});
     expect(trace).toMatchObject({
-      rootSpanName: "invoke_agent",
       request: "weather in Kyoto?",
       response: "It is raining in Kyoto.",
+      rootSpanName: "invoke_agent",
       toolCallCount: 1,
     });
   });
@@ -324,11 +324,11 @@ describe("devtools trace storage", () => {
   it("counts no tool calls for a plain turn", async () => {
     await storage.storeSpan(
       span({
-        name: "generate_content",
-        traceId: "t1",
-        spanId: "s1",
-        conversationId: CONVERSATION,
         attributes: { "gen_ai.operation.name": "generate_content" },
+        conversationId: CONVERSATION,
+        name: "generate_content",
+        spanId: "s1",
+        traceId: "t1",
       }),
       TAB_A
     );
@@ -340,21 +340,21 @@ describe("devtools trace storage", () => {
   it("counts errors and marks the owning trace as failed", async () => {
     await storage.storeSpan(
       span({
-        name: "generate_content",
-        traceId: "t1",
-        spanId: "s1",
         conversationId: CONVERSATION,
+        name: "generate_content",
+        spanId: "s1",
+        traceId: "t1",
       }),
       TAB_A
     );
     await storage.storeSpan(
       span({
+        conversationId: CONVERSATION,
         name: "generate_content",
-        traceId: "t1",
         spanId: "s2",
         startMs: 1100,
         statusCode: ERROR,
-        conversationId: CONVERSATION,
+        traceId: "t1",
       }),
       TAB_A
     );
@@ -371,25 +371,20 @@ describe("devtools trace storage", () => {
   it("keeps the opening request and the latest response as previews", async () => {
     await storage.storeSpan(
       span({
-        name: "generate_content",
-        traceId: "t1",
-        spanId: "s1",
-        startMs: 1000,
-        conversationId: CONVERSATION,
         attributes: {
           "gen_ai.input.messages": encodeMessages("user", "first question"),
           "gen_ai.output.messages": encodeMessages("assistant", "first answer"),
         },
+        conversationId: CONVERSATION,
+        name: "generate_content",
+        spanId: "s1",
+        startMs: 1000,
+        traceId: "t1",
       }),
       TAB_A
     );
     await storage.storeSpan(
       span({
-        name: "generate_content",
-        traceId: "t2",
-        spanId: "s2",
-        startMs: 2000,
-        conversationId: CONVERSATION,
         attributes: {
           "gen_ai.input.messages": encodeMessages("user", "second question"),
           "gen_ai.output.messages": encodeMessages(
@@ -397,6 +392,11 @@ describe("devtools trace storage", () => {
             "second answer"
           ),
         },
+        conversationId: CONVERSATION,
+        name: "generate_content",
+        spanId: "s2",
+        startMs: 2000,
+        traceId: "t2",
       }),
       TAB_A
     );
@@ -410,14 +410,14 @@ describe("devtools trace storage", () => {
     const long = "x".repeat(500);
     await storage.storeSpan(
       span({
-        name: "generate_content",
-        traceId: "t1",
-        spanId: "s1",
-        conversationId: CONVERSATION,
         attributes: {
           "gen_ai.input.messages": encodeMessages("user", long),
           "gen_ai.output.messages": "not json at all",
         },
+        conversationId: CONVERSATION,
+        name: "generate_content",
+        spanId: "s1",
+        traceId: "t1",
       }),
       TAB_A
     );
@@ -431,10 +431,10 @@ describe("devtools trace storage", () => {
   it("leaves spans without a conversation id out of the sessions view", async () => {
     await storage.storeSpan(
       span({
-        name: "web_ai.check_availability",
-        traceId: "t1",
-        spanId: "s1",
         attributes: { "web_ai.availability.status": "available" },
+        name: "web_ai.check_availability",
+        spanId: "s1",
+        traceId: "t1",
       }),
       TAB_A
     );
@@ -446,10 +446,10 @@ describe("devtools trace storage", () => {
   it("falls back to web_ai.session.id when no conversation id is present", async () => {
     await storage.storeSpan(
       span({
-        name: "web_ai.destroy_session",
-        traceId: "t1",
-        spanId: "s1",
         attributes: { "web_ai.session.id": "session-only" },
+        name: "web_ai.destroy_session",
+        spanId: "s1",
+        traceId: "t1",
       }),
       TAB_A
     );
@@ -461,19 +461,19 @@ describe("devtools trace storage", () => {
   it("scopes traces and sessions to the inspected tab", async () => {
     await storage.storeSpan(
       span({
-        name: "generate_content",
-        traceId: "t1",
-        spanId: "s1",
         conversationId: "conv-a",
+        name: "generate_content",
+        spanId: "s1",
+        traceId: "t1",
       }),
       TAB_A
     );
     await storage.storeSpan(
       span({
-        name: "generate_content",
-        traceId: "t2",
-        spanId: "s2",
         conversationId: "conv-b",
+        name: "generate_content",
+        spanId: "s2",
+        traceId: "t2",
       }),
       TAB_B
     );
@@ -496,11 +496,11 @@ describe("devtools trace storage", () => {
     for (let i = 0; i < 5; i++) {
       await storage.storeSpan(
         span({
+          conversationId: `conv-${i}`,
           name: "generate_content",
-          traceId: `t${i}`,
           spanId: `s${i}`,
           startMs: 1000 + i * 100,
-          conversationId: `conv-${i}`,
+          traceId: `t${i}`,
         }),
         TAB_A
       );
@@ -513,21 +513,21 @@ describe("devtools trace storage", () => {
   it("returns every span of a session in start order across traces", async () => {
     await storage.storeSpan(
       span({
+        conversationId: CONVERSATION,
         name: "generate_content",
-        traceId: "t2",
         spanId: "later",
         startMs: 3000,
-        conversationId: CONVERSATION,
+        traceId: "t2",
       }),
       TAB_A
     );
     await storage.storeSpan(
       span({
+        conversationId: CONVERSATION,
         name: "web_ai.create_session",
-        traceId: "t1",
         spanId: "earlier",
         startMs: 1000,
-        conversationId: CONVERSATION,
+        traceId: "t1",
       }),
       TAB_A
     );
@@ -545,23 +545,23 @@ describe("devtools trace storage", () => {
     // comes first, and the same trace could read either way.
     await storage.storeSpan(
       span({
-        name: "generate_content",
-        traceId: "t1",
-        spanId: "turn-2",
-        parentSpanId: "root",
-        startMs: 2000,
         endMs: 2400,
+        name: "generate_content",
+        parentSpanId: "root",
+        spanId: "turn-2",
+        startMs: 2000,
+        traceId: "t1",
       }),
       TAB_A
     );
     await storage.storeSpan(
       span({
-        name: "execute_tool get_weather",
-        traceId: "t1",
-        spanId: "tool",
-        parentSpanId: "root",
-        startMs: 2000,
         endMs: 2000,
+        name: "execute_tool get_weather",
+        parentSpanId: "root",
+        spanId: "tool",
+        startMs: 2000,
+        traceId: "t1",
       }),
       TAB_A
     );
@@ -573,19 +573,19 @@ describe("devtools trace storage", () => {
   it("clears only the requested tab", async () => {
     await storage.storeSpan(
       span({
-        name: "generate_content",
-        traceId: "t1",
-        spanId: "s1",
         conversationId: "conv-a",
+        name: "generate_content",
+        spanId: "s1",
+        traceId: "t1",
       }),
       TAB_A
     );
     await storage.storeSpan(
       span({
-        name: "generate_content",
-        traceId: "t2",
-        spanId: "s2",
         conversationId: "conv-b",
+        name: "generate_content",
+        spanId: "s2",
+        traceId: "t2",
       }),
       TAB_B
     );
@@ -605,17 +605,17 @@ describe("devtools trace storage", () => {
     for (let i = 0; i < 5; i++) {
       await storage.storeSpan(
         span({
+          conversationId: `conv-${i}`,
           name: "generate_content",
-          traceId: `t${i}`,
           spanId: `s${i}`,
           startMs: 1000 + i * 100,
-          conversationId: `conv-${i}`,
+          traceId: `t${i}`,
         }),
         TAB_A
       );
     }
 
-    await storage.pruneOldTraces({ maxTraces: 2, maxSessions: 100 });
+    await storage.pruneOldTraces({ maxSessions: 100, maxTraces: 2 });
 
     const traces = await storage.listTraces({});
     expect(traces.map((t) => t.traceId)).toEqual(["t4", "t3"]);
@@ -630,17 +630,17 @@ describe("devtools trace storage", () => {
     for (let i = 0; i < 4; i++) {
       await storage.storeSpan(
         span({
+          conversationId: `conv-${i}`,
           name: "generate_content",
-          traceId: `t${i}`,
           spanId: `s${i}`,
           startMs: 1000 + i * 100,
-          conversationId: `conv-${i}`,
+          traceId: `t${i}`,
         }),
         TAB_A
       );
     }
 
-    await storage.pruneOldTraces({ maxTraces: 100, maxSessions: 2 });
+    await storage.pruneOldTraces({ maxSessions: 2, maxTraces: 100 });
 
     const sessions = await storage.listSessions({});
     expect(sessions.map((s) => s.conversationId)).toEqual(["conv-3", "conv-2"]);
@@ -651,10 +651,10 @@ describe("devtools trace storage", () => {
   it("keeps everything when under the caps", async () => {
     await storage.storeSpan(
       span({
-        name: "generate_content",
-        traceId: "t1",
-        spanId: "s1",
         conversationId: CONVERSATION,
+        name: "generate_content",
+        spanId: "s1",
+        traceId: "t1",
       }),
       TAB_A
     );
@@ -668,10 +668,10 @@ describe("devtools trace storage", () => {
   it("clears everything when no tab is given", async () => {
     await storage.storeSpan(
       span({
-        name: "generate_content",
-        traceId: "t1",
-        spanId: "s1",
         conversationId: CONVERSATION,
+        name: "generate_content",
+        spanId: "s1",
+        traceId: "t1",
       }),
       TAB_A
     );

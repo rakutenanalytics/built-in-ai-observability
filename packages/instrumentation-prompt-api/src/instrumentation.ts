@@ -129,12 +129,12 @@ export function wrapSession(
 
     exchange.span.setAttributes(
       exchangeResultAttributes({
+        config,
         exchange,
         output,
-        config,
-        windowTokens: exchange.windowTokens ?? readContextWindow(session),
-        usageBefore: exchange.usageBefore,
         usageAfter: readContextUsage(session),
+        usageBefore: exchange.usageBefore,
+        windowTokens: exchange.windowTokens ?? readContextWindow(session),
       })
     );
     exchange.span.setStatus({ code: SpanStatusCode.OK });
@@ -159,25 +159,25 @@ export function wrapSession(
     const span = tracer.startSpan(
       OPERATION_INVOKE_AGENT,
       {
+        attributes: exchangeAttributes({
+          config,
+          input,
+          providerName,
+          state,
+        }),
         kind: SpanKind.INTERNAL,
         startTime,
-        attributes: exchangeAttributes({
-          state,
-          input,
-          config,
-          providerName,
-        }),
       },
       context.active()
     );
     const spanContext = trace.setSpan(context.active(), span);
     state.exchange = {
-      span,
       context: spanContext,
-      turns: 0,
+      span,
       toolCalls: 0,
-      windowTokens: readContextWindow(session),
+      turns: 0,
       usageBefore: readContextUsage(session),
+      windowTokens: readContextWindow(session),
     };
     return spanContext;
   };
@@ -205,13 +205,13 @@ export function wrapSession(
     // about to start is what keeps the two strictly ordered.
     if (traffic.responses.length > 0) {
       emitToolExecutionSpans({
-        tracer,
-        state,
-        responses: traffic.responses,
         config,
-        providerName,
-        fallbackParent: parent,
         endTime: at,
+        fallbackParent: parent,
+        providerName,
+        responses: traffic.responses,
+        state,
+        tracer,
       });
     }
 
@@ -219,7 +219,7 @@ export function wrapSession(
       state.exchange.turns += 1;
     }
 
-    return { traffic, continuation, parent, startTime: at };
+    return { continuation, parent, startTime: at, traffic };
   };
 
   const activate = (parent: Context, span: Span): Context => {
@@ -252,12 +252,12 @@ export function wrapSession(
     traffic: ToolTraffic
   ) =>
     requestAttributes({
-      state,
+      config,
       input,
       options: opts,
-      streaming,
-      config,
       providerName,
+      state,
+      streaming,
       traffic,
     });
 
@@ -272,9 +272,9 @@ export function wrapSession(
     const span = tracer.startSpan(
       "generate_content",
       {
+        attributes: startTurn(input, opts, false, traffic),
         kind: SpanKind.INTERNAL,
         startTime,
-        attributes: startTurn(input, opts, false, traffic),
       },
       parent
     );
@@ -304,15 +304,15 @@ export function wrapSession(
         reconcileContextOverflow(span, state, before, after);
         span.setAttributes(
           resultAttributes({
+            after,
+            before,
+            config,
+            finishReason:
+              turn.toolCalls.length > 0 ? FINISH_TOOL_CALL : FINISH_STOP,
+            output: turn,
             session,
             state,
             windowTokens,
-            before,
-            output: turn,
-            finishReason:
-              turn.toolCalls.length > 0 ? FINISH_TOOL_CALL : FINISH_STOP,
-            config,
-            after,
           })
         );
         span.setStatus({ code: SpanStatusCode.OK });
@@ -322,13 +322,13 @@ export function wrapSession(
         reconcileContextOverflow(span, state, before, after);
         span.setAttributes(
           resultAttributes({
+            after,
+            before,
+            config,
+            finishReason: finishReasonFor(err),
             session,
             state,
             windowTokens,
-            before,
-            finishReason: finishReasonFor(err),
-            config,
-            after,
           })
         );
         recordError(span, err);
@@ -354,9 +354,9 @@ export function wrapSession(
     const span = tracer.startSpan(
       "generate_content",
       {
+        attributes: startTurn(input, opts, true, traffic),
         kind: SpanKind.INTERNAL,
         startTime,
-        attributes: startTurn(input, opts, true, traffic),
       },
       parent
     );
@@ -373,14 +373,14 @@ export function wrapSession(
       reconcileContextOverflow(span, state, before, after);
       span.setAttributes(
         resultAttributes({
+          after,
+          before,
+          config,
+          finishReason,
+          output,
           session,
           state,
           windowTokens,
-          before,
-          output,
-          finishReason,
-          config,
-          after,
         })
       );
     };
@@ -463,8 +463,8 @@ export function wrapSession(
     closeExchange(spanTimestamp());
 
     const span = tracer.startSpan("web_ai.destroy_session", {
-      kind: SpanKind.INTERNAL,
       attributes: promptApiAttributes(state),
+      kind: SpanKind.INTERNAL,
     });
     try {
       session.destroy();
@@ -479,8 +479,8 @@ export function wrapSession(
 
   const tracedClone = async (opts?: LanguageModelCloneOptions) => {
     const span = tracer.startSpan("web_ai.clone_session", {
-      kind: SpanKind.INTERNAL,
       attributes: promptApiAttributes(state),
+      kind: SpanKind.INTERNAL,
     });
     try {
       const cloned = await session.clone(opts);
@@ -489,8 +489,8 @@ export function wrapSession(
       const childState = createSessionState(
         {
           conversationId: state.conversationId,
-          sessionId: crypto.randomUUID(),
           parentSessionId: state.sessionId,
+          sessionId: crypto.randomUUID(),
         },
         [...state.tools.values()]
       );
@@ -505,10 +505,10 @@ export function wrapSession(
   };
 
   const overrides: Record<string, unknown> = {
+    clone: tracedClone,
+    destroy: tracedDestroy,
     prompt: tracedPrompt,
     promptStreaming: tracedPromptStreaming,
-    destroy: tracedDestroy,
-    clone: tracedClone,
   };
 
   return new Proxy(session, {
@@ -526,10 +526,10 @@ export function wrapSession(
 
 export interface PromptInstrumentationOptions
   extends Partial<InstrumentationConfig> {
-  tracerProvider?: { getTracer: (name: string, version?: string) => Tracer };
-  tracerName?: string;
-  tracerVersion?: string;
   providerName?: string;
+  tracerName?: string;
+  tracerProvider?: { getTracer: (name: string, version?: string) => Tracer };
+  tracerVersion?: string;
 }
 
 type CreateFn = typeof LanguageModel.create;
@@ -571,11 +571,11 @@ export class PromptApiInstrumentation {
     );
 
     const span = this.tracer.startSpan("web_ai.create_session", {
-      kind: SpanKind.INTERNAL,
       attributes: {
         ...promptApiAttributes(state),
         ...createSessionAttributes(options, this.config),
       },
+      kind: SpanKind.INTERNAL,
     });
 
     try {
@@ -608,11 +608,11 @@ export class PromptApiInstrumentation {
     options: LanguageModelCreateOptions
   ): Promise<Availability> {
     const span = this.tracer.startSpan("web_ai.check_availability", {
-      kind: SpanKind.INTERNAL,
       attributes: {
         [WEB_AI.API_NAME]: PROMPT_API_NAME,
         ...createSessionAttributes(options, this.config),
       },
+      kind: SpanKind.INTERNAL,
     });
     try {
       const status = await original.call(LanguageModel, options);

@@ -14,9 +14,9 @@ const COLLAPSED_CHEVRON = "▸";
 const EXPANDED_CHEVRON = "▾";
 
 export interface TraceListRender {
-  rows: HTMLElement[];
   /** Traces in display order, so the drawer can step through them. */
   order: TraceSummary[];
+  rows: HTMLElement[];
 }
 
 function traceRow(
@@ -66,8 +66,8 @@ export function renderFlatList(
   onOpen: (trace: TraceSummary) => void
 ): TraceListRender {
   return {
-    rows: traces.map((trace) => traceRow(trace, onOpen)),
     order: [...traces],
+    rows: traces.map((trace) => traceRow(trace, onOpen)),
   };
 }
 
@@ -181,5 +181,5 @@ export function renderGroupedList(
     order.push(trace);
   }
 
-  return { rows, order };
+  return { order, rows };
 }

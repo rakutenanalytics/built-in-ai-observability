@@ -65,10 +65,10 @@ export function renderSpanDetail(
 
   container.append(
     buildTabs([
-      { label: "Inputs / Outputs", content: renderIoTab(span) },
-      { label: "Attributes", content: renderAttributesTab(span) },
+      { content: renderIoTab(span), label: "Inputs / Outputs" },
+      { content: renderAttributesTab(span), label: "Attributes" },
       ...(span.events.length > 0
-        ? [{ label: "Events", content: renderEventsTab(span) }]
+        ? [{ content: renderEventsTab(span), label: "Events" }]
         : []),
     ])
   );

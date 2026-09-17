@@ -74,12 +74,12 @@ export function metaList(entries: MetaEntry[]): HTMLElement {
  */
 export interface SpanView {
   element: HTMLElement;
-  setActive(spanId: string): void;
+  setActive: (spanId: string) => void;
 }
 
 export interface TabDef {
-  label: string;
   content: HTMLElement;
+  label: string;
 }
 
 /**

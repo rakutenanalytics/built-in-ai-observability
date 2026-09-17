@@ -11,13 +11,13 @@ export const BRIDGE_SPAN = "web-ai-otel:bridge-span";
 export const TRACES_UPDATED = "web-ai-otel:traces-updated";
 
 export interface BridgeSpanMessage {
-  type: typeof BRIDGE_SPAN;
   payload: SerializedSpan;
+  type: typeof BRIDGE_SPAN;
 }
 
 export interface TracesUpdatedMessage {
-  type: typeof TRACES_UPDATED;
   tabId?: number;
+  type: typeof TRACES_UPDATED;
 }
 
 export type PanelRequest =
@@ -29,12 +29,12 @@ export type PanelRequest =
   | { type: "export-traces"; tabId?: number };
 
 export interface PanelResponses {
-  "list-traces": { traces: TraceSummary[] };
-  "list-sessions": { sessions: SessionSummary[] };
-  "get-trace-spans": { spans: StoredSpan[] };
-  "get-session-spans": { spans: StoredSpan[] };
   "clear-traces": { ok: true };
   "export-traces": { spans: StoredSpan[] };
+  "get-session-spans": { spans: StoredSpan[] };
+  "get-trace-spans": { spans: StoredSpan[] };
+  "list-sessions": { sessions: SessionSummary[] };
+  "list-traces": { traces: TraceSummary[] };
 }
 
 export type PanelResponse<T extends PanelRequest["type"]> =

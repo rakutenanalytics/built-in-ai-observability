@@ -24,9 +24,8 @@ export {
 const DEFAULT_OTLP_URL = "http://localhost:4318/v1/traces";
 
 export interface WebAISDKOptions extends Partial<InstrumentationConfig> {
-  serviceName?: string;
-  otlpUrl?: string;
   otlpHeaders?: Record<string, string>;
+  otlpUrl?: string;
   /** Enable Prompt API instrumentation. Defaults to true. */
   prompt?: boolean;
   /**
@@ -34,6 +33,7 @@ export interface WebAISDKOptions extends Partial<InstrumentationConfig> {
    * Disable when the host app already manages its own. Defaults to true.
    */
   registerGlobal?: boolean;
+  serviceName?: string;
 }
 
 export class WebAISDK {
@@ -71,7 +71,7 @@ export class WebAISDK {
       }),
       spanProcessors: [
         new BatchSpanProcessor(
-          new OTLPTraceExporter({ url: otlpUrl, headers: otlpHeaders })
+          new OTLPTraceExporter({ headers: otlpHeaders, url: otlpUrl })
         ),
       ],
     });

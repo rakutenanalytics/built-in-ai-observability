@@ -11,11 +11,11 @@ interface NavigatorUADataBrand {
 
 interface NavigatorUAData {
   brands: NavigatorUADataBrand[];
+  getHighEntropyValues: (
+    hints: string[]
+  ) => Promise<{ fullVersionList?: NavigatorUADataBrand[] }>;
   mobile: boolean;
   platform: string;
-  getHighEntropyValues(
-    hints: string[]
-  ): Promise<{ fullVersionList?: NavigatorUADataBrand[] }>;
 }
 
 interface ExtendedNavigator extends Navigator {
@@ -65,7 +65,7 @@ export function browserResourceAttributes(): BrowserResourceAttributes {
     "user_agent.original": navigator.userAgent,
   };
 
-  const deviceMemory = nav.deviceMemory;
+  const { deviceMemory } = nav;
   if (deviceMemory !== undefined && Number.isFinite(deviceMemory)) {
     attributes[WEB_AI.DEVICE_MEMORY_GIB] = deviceMemory;
   }

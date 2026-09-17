@@ -10,16 +10,16 @@ import {
 
 function validSpan(overrides: Record<string, unknown> = {}) {
   return {
-    protocolVersion: PROTOCOL_VERSION,
-    traceId: "0123456789abcdef0123456789abcdef",
-    spanId: "0123456789abcdef",
-    name: "generate_content",
-    kind: 0,
-    startTime: [1_700_000_000, 0],
-    endTime: [1_700_000_001, 0],
     attributes: { "gen_ai.provider.name": "google.chrome" },
+    endTime: [1_700_000_001, 0],
     events: [],
+    kind: 0,
+    name: "generate_content",
+    protocolVersion: PROTOCOL_VERSION,
+    spanId: "0123456789abcdef",
+    startTime: [1_700_000_000, 0],
     status: { code: 1 },
+    traceId: "0123456789abcdef0123456789abcdef",
     ...overrides,
   };
 }
@@ -28,9 +28,9 @@ describe("isSpanMessage", () => {
   it("accepts a well-formed envelope", () => {
     expect(
       isSpanMessage({
+        payload: validSpan(),
         source: MESSAGE_SOURCE,
         type: SPAN_MESSAGE_TYPE,
-        payload: validSpan(),
       })
     ).toBe(true);
   });
@@ -40,9 +40,9 @@ describe("isSpanMessage", () => {
     ["a primitive", "web-ai-otel"],
     [
       "a foreign source",
-      { source: "other", type: SPAN_MESSAGE_TYPE, payload: {} },
+      { payload: {}, source: "other", type: SPAN_MESSAGE_TYPE },
     ],
-    ["a foreign type", { source: MESSAGE_SOURCE, type: "other", payload: {} }],
+    ["a foreign type", { payload: {}, source: MESSAGE_SOURCE, type: "other" }],
     ["a missing payload", { source: MESSAGE_SOURCE, type: SPAN_MESSAGE_TYPE }],
   ])("rejects %s", (_label, input) => {
     expect(isSpanMessage(input)).toBe(false);
@@ -85,7 +85,7 @@ describe("validateSerializedSpan", () => {
 
   it("keeps only string url and origin on frame", () => {
     const span = validateSerializedSpan(
-      validSpan({ frame: { url: "https://example.com/a", origin: 42 } })
+      validSpan({ frame: { origin: 42, url: "https://example.com/a" } })
     );
     expect(span?.frame?.url).toBe("https://example.com/a");
     expect(span?.frame?.origin).toBeUndefined();
@@ -102,9 +102,9 @@ describe("validateSerializedSpan", () => {
       validSpan({
         events: [
           {
+            attributes: { "web_ai.context.overflowed": true },
             name: "web_ai.context_overflow",
             time: [1_700_000_000, 5],
-            attributes: { "web_ai.context.overflowed": true },
           },
         ],
       })

@@ -9,26 +9,26 @@ const HEX_ID = /^[0-9a-f]+$/;
 
 /** A span as reported by the instrumented page. Everything here is untrusted. */
 export interface SerializedSpan {
-  protocolVersion: number;
-  traceId: string;
-  spanId: string;
-  parentSpanId?: string;
-  name: string;
-  kind: number;
-  startTime: [number, number];
-  endTime: [number, number];
   attributes: Record<string, unknown>;
+  endTime: [number, number];
   events: Array<{
     name: string;
     time: [number, number];
     attributes?: Record<string, unknown>;
   }>;
-  status: { code: number; message?: string };
   /** Self-reported by the page; prefer `SpanSource` for attribution. */
   frame?: {
     url?: string;
     origin?: string;
   };
+  kind: number;
+  name: string;
+  parentSpanId?: string;
+  protocolVersion: number;
+  spanId: string;
+  startTime: [number, number];
+  status: { code: number; message?: string };
+  traceId: string;
 }
 
 /**
@@ -36,16 +36,16 @@ export interface SerializedSpan {
  * page, so it cannot be spoofed by page scripts.
  */
 export interface SpanSource {
-  tabId?: number;
   frameId?: number;
-  url?: string;
   origin?: string;
+  tabId?: number;
+  url?: string;
 }
 
 export interface SpanMessage {
+  payload: SerializedSpan;
   source: typeof MESSAGE_SOURCE;
   type: typeof SPAN_MESSAGE_TYPE;
-  payload: SerializedSpan;
 }
 
 export function isSpanMessage(data: unknown): data is SpanMessage {
@@ -92,9 +92,9 @@ function validateEvents(value: unknown): SerializedSpan["events"] | null {
       return null;
     }
     events.push({
+      attributes: isPlainRecord(raw.attributes) ? raw.attributes : undefined,
       name: raw.name,
       time: raw.time,
-      attributes: isPlainRecord(raw.attributes) ? raw.attributes : undefined,
     });
   }
   return events;
@@ -103,17 +103,17 @@ function validateEvents(value: unknown): SerializedSpan["events"] | null {
 type Unknowns = Record<string, unknown>;
 
 interface SpanIds {
-  traceId: string;
-  spanId: string;
   parentSpanId?: string;
+  spanId: string;
+  traceId: string;
 }
 
 interface SpanBody {
-  name: string;
-  kind: number;
-  startTime: [number, number];
-  endTime: [number, number];
   attributes: Record<string, unknown>;
+  endTime: [number, number];
+  kind: number;
+  name: string;
+  startTime: [number, number];
   status: Unknowns & { code: number };
 }
 
@@ -143,8 +143,8 @@ function normalizeFrame(value: unknown): SerializedSpan["frame"] {
     return;
   }
   return {
-    url: typeof value.url === "string" ? value.url : undefined,
     origin: typeof value.origin === "string" ? value.origin : undefined,
+    url: typeof value.url === "string" ? value.url : undefined,
   };
 }
 
@@ -170,16 +170,16 @@ export function validateSerializedSpan(
   }
 
   return {
-    protocolVersion: PROTOCOL_VERSION,
-    traceId: payload.traceId,
-    spanId: payload.spanId,
-    parentSpanId: payload.parentSpanId,
-    name: payload.name,
-    kind: payload.kind,
-    startTime: payload.startTime,
-    endTime: payload.endTime,
     attributes: payload.attributes,
+    endTime: payload.endTime,
     events,
+    frame: normalizeFrame(payload.frame),
+    kind: payload.kind,
+    name: payload.name,
+    parentSpanId: payload.parentSpanId,
+    protocolVersion: PROTOCOL_VERSION,
+    spanId: payload.spanId,
+    startTime: payload.startTime,
     status: {
       code: payload.status.code,
       message:
@@ -187,6 +187,6 @@ export function validateSerializedSpan(
           ? payload.status.message
           : undefined,
     },
-    frame: normalizeFrame(payload.frame),
+    traceId: payload.traceId,
   };
 }

@@ -33,31 +33,31 @@ const MLFLOW_OUTPUTS = "mlflow.spanOutputs";
 export interface PendingToolCall extends ToolCallInfo {
   /** Stands in for `callID`, which Chrome leaves empty. */
   index: number;
-  turnIndex: number;
+  /** Context of the turn that asked for the call. */
+  parent: Context;
   /**
    * When the turn that asked for it ended, so the tool span can be backdated.
    * Epoch ms off the monotonic clock — see `spanTimestamp`.
    */
   runnableAt: number;
-  /** Context of the turn that asked for the call. */
-  parent: Context;
+  turnIndex: number;
 }
 
 export interface SessionState extends SessionTelemetryMeta {
-  turnIndex: number;
-  compacted: boolean;
   activeSpans: Set<Span>;
+  compacted: boolean;
+  /** The exchange in flight, if the current question needed tools. */
+  exchange?: Exchange;
+  pendingCalls: PendingToolCall[];
   /**
    * Set when the session reports an overflow while no span is in flight, so the
    * next turn can carry it. Cleared once attributed.
    */
   pendingOverflow: boolean;
+  toolCallSeq: number;
   /** Declared tools by name, so a tool span can carry its description. */
   tools: Map<string, LanguageModelToolDeclaration>;
-  pendingCalls: PendingToolCall[];
-  toolCallSeq: number;
-  /** The exchange in flight, if the current question needed tools. */
-  exchange?: Exchange;
+  turnIndex: number;
 }
 
 /**
@@ -70,12 +70,12 @@ export interface SessionState extends SessionTelemetryMeta {
  * while a trace is read from its root.
  */
 export interface Exchange {
-  span: Span;
   context: Context;
-  turns: number;
+  span: Span;
   toolCalls: number;
-  windowTokens?: number;
+  turns: number;
   usageBefore?: number;
+  windowTokens?: number;
 }
 
 const overflowRecordedSpans = new WeakSet<Span>();
@@ -94,13 +94,13 @@ export function createSessionState(
 ): SessionState {
   return {
     ...meta,
-    turnIndex: 0,
-    compacted: false,
     activeSpans: new Set(),
-    pendingOverflow: false,
-    tools: new Map(tools.map((tool) => [tool.name, tool])),
+    compacted: false,
     pendingCalls: [],
+    pendingOverflow: false,
     toolCallSeq: 0,
+    tools: new Map(tools.map((tool) => [tool.name, tool])),
+    turnIndex: 0,
   };
 }
 
@@ -119,10 +119,10 @@ function toolDeclarationAttributes(
     attributes[GEN_AI.TOOL_DEFINITIONS] = truncateAttribute(
       JSON.stringify(
         tools.map(({ name, description, inputSchema }) => ({
-          type: TOOL_TYPE_FUNCTION,
-          name,
           description,
+          name,
           parameters: inputSchema,
+          type: TOOL_TYPE_FUNCTION,
         }))
       ),
       config.maxAttributeLength
@@ -156,7 +156,7 @@ function systemInstructionAttributes(
   };
   if (config.includeMlflowPreview) {
     const preview = mlflowChatPreview(
-      [{ role: "system", parts: instructions }],
+      [{ parts: instructions, role: "system" }],
       config.maxAttributeLength
     );
     if (preview) {
@@ -250,12 +250,12 @@ export function reconcileContextOverflow(
 }
 
 export interface TurnRequest {
-  state: SessionState;
+  config: InstrumentationConfig;
   input: unknown;
   options?: LanguageModelPromptOptions;
-  streaming: boolean;
-  config: InstrumentationConfig;
   providerName: string;
+  state: SessionState;
+  streaming: boolean;
   traffic: ToolTraffic;
 }
 
@@ -311,14 +311,14 @@ export function requestAttributes(request: TurnRequest): Attributes {
 }
 
 export interface TurnResult {
+  after?: number;
+  before?: number;
+  config: InstrumentationConfig;
+  finishReason: string;
+  output?: string | AssistantTurn;
   session: LanguageModel;
   state: SessionState;
   windowTokens?: number;
-  before?: number;
-  output?: string | AssistantTurn;
-  finishReason: string;
-  config: InstrumentationConfig;
-  after?: number;
 }
 
 /** Names of the tools a turn asked for, recorded whatever the capture config. */
@@ -383,10 +383,10 @@ export function resultAttributes(result: TurnResult): Attributes {
 }
 
 export interface ExchangeRequest {
-  state: SessionState;
-  input: unknown;
   config: InstrumentationConfig;
+  input: unknown;
   providerName: string;
+  state: SessionState;
 }
 
 /** Attributes for the span that opens an exchange, before any turn has run. */
@@ -402,11 +402,11 @@ export function exchangeAttributes(request: ExchangeRequest): Attributes {
 
   if (config.captureInput) {
     captureInputAttributes(attributes, {
-      state,
-      input,
-      streaming: false,
       config,
+      input,
       providerName,
+      state,
+      streaming: false,
       traffic: { calls: [], responses: [] },
     });
   }
@@ -415,13 +415,13 @@ export function exchangeAttributes(request: ExchangeRequest): Attributes {
 }
 
 export interface ExchangeResult {
+  config: InstrumentationConfig;
   exchange: Exchange;
   /** The turn that ended the exchange, absent if it was abandoned. */
   output?: string | AssistantTurn;
-  config: InstrumentationConfig;
-  windowTokens?: number;
-  usageBefore?: number;
   usageAfter?: number;
+  usageBefore?: number;
+  windowTokens?: number;
 }
 
 /** Attributes known only once an exchange is over. */

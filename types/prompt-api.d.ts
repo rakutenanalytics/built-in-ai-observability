@@ -56,8 +56,8 @@ type LanguageModelMessageType =
   | "tool-response";
 
 interface LanguageModelExpected {
-  type: LanguageModelMessageType;
   languages?: string[];
+  type: LanguageModelMessageType;
 }
 
 /**
@@ -65,9 +65,9 @@ interface LanguageModelExpected {
  * browser never runs a tool, it only asks for one.
  */
 interface LanguageModelToolDeclaration {
-  name: string;
   description: string;
   inputSchema: object;
+  name: string;
 }
 
 /**
@@ -76,9 +76,9 @@ interface LanguageModelToolDeclaration {
  * calls apart.
  */
 interface LanguageModelToolCall {
+  readonly arguments: Record<string, unknown>;
   readonly callID: string;
   readonly name: string;
-  readonly arguments: Record<string, unknown>;
 }
 
 /** Chrome supports only `text` and `object` results, not `image` or `audio`. */
@@ -95,8 +95,8 @@ interface LanguageModelToolSuccess {
 
 interface LanguageModelToolError {
   readonly callID: string;
-  readonly name: string;
   readonly errorMessage: string;
+  readonly name: string;
 }
 
 type LanguageModelToolResponse =
@@ -124,12 +124,12 @@ type LanguageModelMessageContent =
   | LanguageModelToolResponseContent;
 
 interface LanguageModelMessage {
+  content: string | LanguageModelMessageContent[];
+  prefix?: boolean;
   /**
    * There is no `tool` role: tool responses travel as `user` content parts.
    */
   role: "system" | "user" | "assistant";
-  content: string | LanguageModelMessageContent[];
-  prefix?: boolean;
 }
 
 /**
@@ -150,8 +150,8 @@ type LanguageModelPrompt =
   | LanguageModelMessage;
 
 interface LanguageModelPromptOptions {
-  responseConstraint?: object;
   omitResponseConstraintInput?: boolean;
+  responseConstraint?: object;
   signal?: AbortSignal;
 }
 
@@ -160,37 +160,37 @@ interface LanguageModelCloneOptions {
 }
 
 interface LanguageModelCreateOptions {
-  topK?: number;
-  temperature?: number;
-  samplingMode?: string;
   expectedInputs?: LanguageModelExpected[];
   expectedOutputs?: LanguageModelExpected[];
   initialPrompts?: LanguageModelMessage[];
-  tools?: LanguageModelToolDeclaration[];
-  signal?: AbortSignal;
   monitor?: CreateMonitorCallback;
+  samplingMode?: string;
+  signal?: AbortSignal;
+  temperature?: number;
+  tools?: LanguageModelToolDeclaration[];
+  topK?: number;
 }
 
 interface LanguageModel extends EventTarget {
-  prompt(
-    input: LanguageModelPrompt,
-    options?: LanguageModelPromptOptions
-  ): Promise<LanguageModelOutput>;
-  promptStreaming(
-    input: LanguageModelPrompt,
-    options?: LanguageModelPromptOptions
-  ): ReadableStream<LanguageModelStreamChunk>;
-  clone(options?: LanguageModelCloneOptions): Promise<LanguageModel>;
-  destroy(): void;
-  readonly contextWindow?: number;
+  clone: (options?: LanguageModelCloneOptions) => Promise<LanguageModel>;
   readonly contextUsage?: number;
+  readonly contextWindow?: number;
+  destroy: () => void;
   readonly inputQuota?: number;
   readonly inputUsage?: number;
+  prompt: (
+    input: LanguageModelPrompt,
+    options?: LanguageModelPromptOptions
+  ) => Promise<LanguageModelOutput>;
+  promptStreaming: (
+    input: LanguageModelPrompt,
+    options?: LanguageModelPromptOptions
+  ) => ReadableStream<LanguageModelStreamChunk>;
 }
 
 interface LanguageModelConstructor {
-  create(options?: LanguageModelCreateOptions): Promise<LanguageModel>;
-  availability(options?: LanguageModelCreateOptions): Promise<Availability>;
+  availability: (options?: LanguageModelCreateOptions) => Promise<Availability>;
+  create: (options?: LanguageModelCreateOptions) => Promise<LanguageModel>;
 }
 
 declare const LanguageModel: LanguageModelConstructor;

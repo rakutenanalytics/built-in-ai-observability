@@ -11,23 +11,23 @@
 
 /** A tool the model asked for. */
 export interface ToolCallInfo {
+  arguments?: unknown;
   /**
    * Chrome currently leaves this empty, even for several calls in one turn, so
    * it cannot be used to tell calls apart. Kept because the spec defines it.
    */
   id: string;
   name: string;
-  arguments?: unknown;
 }
 
 /** The page's answer to one call: a result, or a failure. */
 export interface ToolResponseInfo {
+  /** Absent on success. */
+  errorMessage?: string;
   id: string;
   name: string;
   /** Result parts, as `{ type, value }`. Absent on failure. */
   result?: unknown;
-  /** Absent on success. */
-  errorMessage?: string;
 }
 
 export interface ToolTraffic {
@@ -74,9 +74,9 @@ export function readToolCall(value: unknown): ToolCallInfo | undefined {
     return;
   }
   return {
+    arguments: fields.arguments,
     id: stringField(fields, "callID") ?? "",
     name,
-    arguments: fields.arguments,
   };
 }
 
@@ -90,7 +90,7 @@ export function readToolResponse(value: unknown): ToolResponseInfo | undefined {
   const id = stringField(fields, "callID") ?? "";
   const errorMessage = stringField(fields, "errorMessage");
   if (errorMessage !== undefined) {
-    return { id, name, errorMessage };
+    return { errorMessage, id, name };
   }
   return { id, name, result: readToolResult(fields.result) };
 }

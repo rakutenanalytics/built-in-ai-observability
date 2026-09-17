@@ -14,7 +14,7 @@ import {
 describe("encodeInputMessages", () => {
   it("wraps a bare string as a user text part", () => {
     expect(encodeInputMessages("hello")).toEqual([
-      { role: "user", parts: [{ type: "text", content: "hello" }] },
+      { parts: [{ content: "hello", type: "text" }], role: "user" },
     ]);
   });
 
@@ -24,20 +24,20 @@ describe("encodeInputMessages", () => {
 
   it("reads text from either value or content", () => {
     const parts = encodeInputMessages([
-      { role: "user", content: [{ type: "text", value: "from-value" }] },
-      { role: "user", content: [{ type: "text", content: "from-content" }] },
+      { content: [{ type: "text", value: "from-value" }], role: "user" },
+      { content: [{ content: "from-content", type: "text" }], role: "user" },
     ]);
-    expect(parts[0]?.parts).toEqual([{ type: "text", content: "from-value" }]);
+    expect(parts[0]?.parts).toEqual([{ content: "from-value", type: "text" }]);
     expect(parts[1]?.parts).toEqual([
-      { type: "text", content: "from-content" },
+      { content: "from-content", type: "text" },
     ]);
   });
 
   it("redacts non-text modalities, keeping only the kind", () => {
     const [message] = encodeInputMessages([
-      { role: "user", content: [{ type: "image", value: "secret-bytes" }] },
+      { content: [{ type: "image", value: "secret-bytes" }], role: "user" },
     ]);
-    expect(message?.parts).toEqual([{ type: "redacted", modality: "image" }]);
+    expect(message?.parts).toEqual([{ modality: "image", type: "redacted" }]);
     expect(JSON.stringify(message)).not.toContain("secret-bytes");
   });
 });
@@ -46,9 +46,9 @@ describe("encodeOutputMessages", () => {
   it("records the assistant reply and finish reason", () => {
     expect(encodeOutputMessages("done", "stop")).toEqual([
       {
-        role: "assistant",
-        parts: [{ type: "text", content: "done" }],
         finish_reason: "stop",
+        parts: [{ content: "done", type: "text" }],
+        role: "assistant",
       },
     ]);
   });
@@ -58,15 +58,15 @@ describe("encodeSystemInstructions", () => {
   it("collects only system messages", () => {
     expect(
       encodeSystemInstructions([
-        { role: "system", content: "be terse" },
-        { role: "user", content: "ignored" },
+        { content: "be terse", role: "system" },
+        { content: "ignored", role: "user" },
       ])
-    ).toEqual([{ type: "text", content: "be terse" }]);
+    ).toEqual([{ content: "be terse", type: "text" }]);
   });
 
   it("returns undefined when there are no system messages", () => {
     expect(
-      encodeSystemInstructions([{ role: "user", content: "hi" }])
+      encodeSystemInstructions([{ content: "hi", role: "user" }])
     ).toBeUndefined();
   });
 
@@ -74,14 +74,14 @@ describe("encodeSystemInstructions", () => {
     expect(
       encodeSystemInstructions([
         {
-          role: "system",
           content: [
             { type: "text", value: "rule" },
             { type: "image", value: "logo" },
           ],
+          role: "system",
         },
       ])
-    ).toEqual([{ type: "text", content: "rule" }]);
+    ).toEqual([{ content: "rule", type: "text" }]);
   });
 });
 
@@ -95,44 +95,44 @@ describe("mlflowChatPreview", () => {
     expect(
       preview([
         {
-          role: "user",
           parts: [
-            { type: "text", content: "a" },
-            { type: "text", content: "b" },
+            { content: "a", type: "text" },
+            { content: "b", type: "text" },
           ],
+          role: "user",
         },
       ])
-    ).toEqual({ messages: [{ role: "user", content: "a\nb" }] });
+    ).toEqual({ messages: [{ content: "a\nb", role: "user" }] });
   });
 
   it("carries a tool call over as an OpenAI tool_calls entry", () => {
     expect(
       preview([
         {
-          role: "assistant",
           parts: [
             {
-              type: "tool_call",
+              arguments: { city: "Kyoto" },
               id: "call-1",
               name: "get_weather",
-              arguments: { city: "Kyoto" },
+              type: "tool_call",
             },
           ],
+          role: "assistant",
         },
       ])
     ).toEqual({
       messages: [
         {
-          role: "assistant",
           content: null,
+          role: "assistant",
           tool_calls: [
             {
+              function: {
+                arguments: '{"city":"Kyoto"}',
+                name: "get_weather",
+              },
               id: "call-1",
               type: "function",
-              function: {
-                name: "get_weather",
-                arguments: '{"city":"Kyoto"}',
-              },
             },
           ],
         },
@@ -144,20 +144,20 @@ describe("mlflowChatPreview", () => {
     expect(
       preview([
         {
-          role: "user",
           parts: [
             {
-              type: "tool_call_response",
               id: "call-1",
               name: "get_weather",
               response: { tempC: 24 },
+              type: "tool_call_response",
             },
           ],
+          role: "user",
         },
       ])
     ).toEqual({
       messages: [
-        { role: "tool", tool_call_id: "call-1", content: '{"tempC":24}' },
+        { content: '{"tempC":24}', role: "tool", tool_call_id: "call-1" },
       ],
     });
   });
@@ -166,13 +166,13 @@ describe("mlflowChatPreview", () => {
     expect(
       preview([
         {
-          role: "user",
           parts: [
-            { type: "tool_call_response", name: "get_weather", error: "boom" },
+            { error: "boom", name: "get_weather", type: "tool_call_response" },
           ],
+          role: "user",
         },
       ])
-    ).toEqual({ messages: [{ role: "tool", content: '"boom"' }] });
+    ).toEqual({ messages: [{ content: '"boom"', role: "tool" }] });
   });
 
   /**
@@ -182,19 +182,19 @@ describe("mlflowChatPreview", () => {
   it("stands in for a redacted modality so the preview is never empty", () => {
     expect(
       preview([
-        { role: "user", parts: [{ type: "redacted", modality: "image" }] },
+        { parts: [{ modality: "image", type: "redacted" }], role: "user" },
       ])
-    ).toEqual({ messages: [{ role: "user", content: "[image]" }] });
+    ).toEqual({ messages: [{ content: "[image]", role: "user" }] });
   });
 
   it("returns nothing when there is no part to preview", () => {
-    expect(mlflowChatPreview([{ role: "user", parts: [] }], 0)).toBeUndefined();
+    expect(mlflowChatPreview([{ parts: [], role: "user" }], 0)).toBeUndefined();
   });
 
   it("truncates to the configured attribute length", () => {
     expect(
       mlflowChatPreview(
-        [{ role: "user", parts: [{ type: "text", content: "hello" }] }],
+        [{ parts: [{ content: "hello", type: "text" }], role: "user" }],
         4
       )
     ).toBe('{"me…[truncated]');
@@ -204,10 +204,10 @@ describe("mlflowChatPreview", () => {
 describe("contextAttributes", () => {
   it("derives delta, remaining and utilization", () => {
     expect(contextAttributes(1000, 100, 300)).toEqual({
-      "web_ai.context.usage_before_tokens": 100,
-      "web_ai.context.usage_after_tokens": 300,
-      "web_ai.context.usage_delta_tokens": 200,
       "web_ai.context.remaining_after_tokens": 700,
+      "web_ai.context.usage_after_tokens": 300,
+      "web_ai.context.usage_before_tokens": 100,
+      "web_ai.context.usage_delta_tokens": 200,
       "web_ai.context.utilization_after": 0.3,
     });
   });
@@ -234,16 +234,16 @@ describe("sessionAttributes", () => {
       sessionAttributes({ conversationId: "c1", sessionId: "s1" })
     ).toEqual({
       "gen_ai.conversation.id": "c1",
-      "web_ai.session.id": "s1",
       "session.id": "s1",
+      "web_ai.session.id": "s1",
     });
   });
 
   it("includes the parent session only when cloned", () => {
     const attrs = sessionAttributes({
       conversationId: "c1",
-      sessionId: "s2",
       parentSessionId: "s1",
+      sessionId: "s2",
     });
     expect(attrs["web_ai.session.parent_id"]).toBe("s1");
   });

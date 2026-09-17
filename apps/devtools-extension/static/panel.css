@@ -1,8 +1,8 @@
 :root {
-  color-scheme: light dark;
   font-family: system-ui, -apple-system, sans-serif;
   font-size: 13px;
   line-height: 1.4;
+  color-scheme: light dark;
 }
 
 * {
@@ -20,14 +20,14 @@
 
 body {
   margin: 0;
-  background: Canvas;
   color: CanvasText;
+  background: Canvas;
 }
 
 header {
   display: flex;
-  align-items: center;
   gap: 12px;
+  align-items: center;
   padding: 8px 12px;
   border-bottom: 1px solid color-mix(in srgb, CanvasText 20%, transparent);
 }
@@ -35,18 +35,18 @@ header {
 .toggle-btn {
   flex: none;
   padding: 3px 10px;
-  border: 1px solid color-mix(in srgb, CanvasText 20%, transparent);
-  border-radius: 4px;
-  background: transparent;
-  color: inherit;
   font: inherit;
   font-size: 12px;
+  color: inherit;
   cursor: pointer;
+  background: transparent;
+  border: 1px solid color-mix(in srgb, CanvasText 20%, transparent);
+  border-radius: 4px;
 }
 
 .toggle-btn[aria-pressed="true"] {
-  background: color-mix(in srgb, Highlight 25%, transparent);
   font-weight: 600;
+  background: color-mix(in srgb, Highlight 25%, transparent);
 }
 
 .view-toggle {
@@ -58,20 +58,20 @@ header {
 }
 
 .view-toggle .toggle-btn:last-child {
-  border-radius: 0 4px 4px 0;
   border-left-width: 0;
+  border-radius: 0 4px 4px 0;
 }
 
 .icon-btn {
   flex: none;
   padding: 2px 7px;
-  border: 1px solid color-mix(in srgb, CanvasText 20%, transparent);
-  border-radius: 4px;
-  background: transparent;
-  color: inherit;
   font: inherit;
   font-size: 12px;
+  color: inherit;
   cursor: pointer;
+  background: transparent;
+  border: 1px solid color-mix(in srgb, CanvasText 20%, transparent);
+  border-radius: 4px;
 }
 
 .icon-btn:hover:not(:disabled) {
@@ -79,24 +79,24 @@ header {
 }
 
 .icon-btn:disabled {
-  opacity: 0.4;
   cursor: default;
+  opacity: 0.4;
 }
 
 .scope {
-  margin: 0;
   flex: 1;
-  font-size: 11px;
-  opacity: 0.7;
+  margin: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+  font-size: 11px;
   white-space: nowrap;
+  opacity: 0.7;
 }
 
 .actions {
   display: flex;
-  gap: 6px;
   flex: none;
+  gap: 6px;
 }
 
 /* The list owns the full width; trace detail arrives as an overlay instead. */
@@ -105,8 +105,8 @@ main {
 }
 
 #trace-list {
-  overflow: auto;
   max-height: calc(100vh - 41px);
+  overflow: auto;
 }
 
 .trace-item {
@@ -114,25 +114,25 @@ main {
   gap: 2px;
   width: 100%;
   padding: 7px 12px;
-  border: 0;
-  border-bottom: 1px solid color-mix(in srgb, CanvasText 10%, transparent);
-  background: transparent;
-  color: inherit;
   font: inherit;
+  color: inherit;
   text-align: left;
   cursor: pointer;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, CanvasText 10%, transparent);
 }
 
 .trace-row-top {
   display: flex;
-  align-items: baseline;
   gap: 8px;
+  align-items: baseline;
   min-width: 0;
 }
 
 .trace-row-right {
-  margin-left: auto;
   flex: none;
+  margin-left: auto;
 }
 
 .trace-row-preview {
@@ -161,11 +161,11 @@ main {
 }
 
 .trace-item .preview {
-  font-size: 11px;
-  opacity: 0.9;
   overflow: hidden;
   text-overflow: ellipsis;
+  font-size: 11px;
   white-space: nowrap;
+  opacity: 0.9;
 }
 
 .trace-item .preview.response {
@@ -173,23 +173,23 @@ main {
 }
 
 .trace-item.has-error .name::after {
-  content: " ⚠";
   color: color-mix(in srgb, Mark 80%, red);
+  content: " ⚠";
 }
 
 .session-row {
   display: flex;
-  align-items: baseline;
   gap: 8px;
+  align-items: baseline;
   width: 100%;
   padding: 6px 12px;
-  border: 0;
-  border-bottom: 1px solid color-mix(in srgb, CanvasText 10%, transparent);
-  background: color-mix(in srgb, CanvasText 4%, transparent);
-  color: inherit;
   font: inherit;
+  color: inherit;
   text-align: left;
   cursor: pointer;
+  background: color-mix(in srgb, CanvasText 4%, transparent);
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, CanvasText 10%, transparent);
 }
 
 .session-row:hover {
@@ -197,8 +197,8 @@ main {
 }
 
 .session-row .name {
-  font-weight: 600;
   font-size: 12px;
+  font-weight: 600;
 }
 
 .session-row .meta {
@@ -221,10 +221,10 @@ main {
   display: flex;
   flex-wrap: wrap;
   gap: 4px 12px;
-  margin: 0 0 12px;
   padding: 0;
-  list-style: none;
+  margin: 0 0 12px;
   font-size: 11px;
+  list-style: none;
   opacity: 0.8;
 }
 
@@ -239,38 +239,38 @@ main {
 
 .drawer-header {
   display: flex;
-  align-items: center;
-  gap: 8px;
   flex: none;
+  gap: 8px;
+  align-items: center;
   padding: 6px 10px;
   border-bottom: 1px solid color-mix(in srgb, CanvasText 20%, transparent);
 }
 
 .drawer-nav {
   display: flex;
-  gap: 2px;
   flex: none;
+  gap: 2px;
 }
 
 .drawer-title {
-  margin: 0;
   flex: none;
+  margin: 0;
   font-size: 13px;
 }
 
 .drawer-title.has-error::after {
-  content: " ⚠";
   color: color-mix(in srgb, Mark 80%, red);
+  content: " ⚠";
 }
 
 .drawer-summary {
-  margin: 0;
   flex: 1;
-  font-size: 11px;
-  opacity: 0.75;
+  margin: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+  font-size: 11px;
   white-space: nowrap;
+  opacity: 0.75;
 }
 
 .drawer-body {
@@ -280,16 +280,16 @@ main {
 }
 
 .spans-section {
-  margin: 0 0 10px;
   padding-bottom: 8px;
+  margin: 0 0 10px;
   border-bottom: 1px solid color-mix(in srgb, CanvasText 15%, transparent);
 }
 
 .spans-header {
   display: flex;
+  gap: 8px;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
   margin-bottom: 6px;
 }
 
@@ -300,8 +300,8 @@ main {
 
 .spans-controls {
   display: flex;
-  align-items: center;
   gap: 6px;
+  align-items: center;
 }
 
 .span-browser-detail {
@@ -335,8 +335,8 @@ main {
   position: absolute;
   top: 0;
   font-size: 10px;
-  opacity: 0.6;
   white-space: nowrap;
+  opacity: 0.6;
 }
 
 .timeline-tick.centered {
@@ -353,13 +353,13 @@ main {
    * column widths and leave the bars out of step with the axis. */
   width: 100%;
   padding: 2px 4px;
-  border: 0;
-  border-radius: 4px;
-  background: transparent;
-  color: inherit;
   font: inherit;
+  color: inherit;
   text-align: left;
   cursor: pointer;
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
 }
 
 .timeline-row:hover {
@@ -367,22 +367,22 @@ main {
 }
 
 .timeline-row.active {
-  background: color-mix(in srgb, Highlight 22%, transparent);
   font-weight: 600;
+  background: color-mix(in srgb, Highlight 22%, transparent);
 }
 
 .timeline-name {
   padding-left: calc(var(--depth, 0) * 10px);
-  font-size: 12px;
   overflow: hidden;
   text-overflow: ellipsis;
+  font-size: 12px;
   white-space: nowrap;
 }
 
 .timeline-duration {
   font-size: 10px;
-  opacity: 0.7;
   text-align: right;
+  opacity: 0.7;
 }
 
 .timeline-track {
@@ -398,11 +398,11 @@ main {
 .timeline-bar {
   position: absolute;
   top: 50%;
-  transform: translateY(-50%);
-  height: 9px;
   min-width: 2px;
-  border-radius: 2px;
+  height: 9px;
   background: color-mix(in srgb, Highlight 65%, CanvasText 10%);
+  border-radius: 2px;
+  transform: translateY(-50%);
 }
 
 .timeline-row.has-error .timeline-bar {
@@ -410,19 +410,19 @@ main {
 }
 
 .timeline-row.has-error .timeline-name::after {
-  content: " ⚠";
   color: color-mix(in srgb, Mark 80%, red);
+  content: " ⚠";
 }
 
 .span-tree.compact {
-  list-style: none;
-  margin: 0;
   padding-left: 12px;
+  margin: 0;
+  list-style: none;
 }
 
 .span-tree.compact.root {
-  padding-left: 0;
   max-height: 40vh;
+  padding-left: 0;
   overflow: auto;
 }
 
@@ -432,18 +432,18 @@ main {
 
 .span-node-btn {
   display: flex;
+  gap: 8px;
   align-items: baseline;
   justify-content: space-between;
-  gap: 8px;
   width: 100%;
   padding: 4px 6px;
-  border: 0;
-  border-radius: 4px;
-  background: transparent;
-  color: inherit;
   font: inherit;
+  color: inherit;
   text-align: left;
   cursor: pointer;
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
 }
 
 .span-node-btn:hover {
@@ -451,26 +451,26 @@ main {
 }
 
 .span-node-btn.active {
-  background: color-mix(in srgb, Highlight 25%, transparent);
   font-weight: 600;
+  background: color-mix(in srgb, Highlight 25%, transparent);
 }
 
 .span-node-btn.has-error .span-node-name::after {
-  content: " ⚠";
   color: color-mix(in srgb, Mark 80%, red);
+  content: " ⚠";
 }
 
 .span-node-name {
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
   font-size: 12px;
+  white-space: nowrap;
 }
 
 .span-node-duration {
+  flex: none;
   font-size: 10px;
   opacity: 0.7;
-  flex: none;
 }
 
 .span-detail {
@@ -489,20 +489,20 @@ main {
 .tab-list {
   display: flex;
   gap: 4px;
-  border-bottom: 1px solid color-mix(in srgb, CanvasText 15%, transparent);
   margin-bottom: 10px;
+  border-bottom: 1px solid color-mix(in srgb, CanvasText 15%, transparent);
 }
 
 .tab-button {
   padding: 6px 4px;
   margin-right: 10px;
-  border: 0;
-  border-bottom: 2px solid transparent;
-  background: transparent;
-  color: inherit;
   font: inherit;
   font-size: 12px;
+  color: inherit;
   cursor: pointer;
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
   opacity: 0.7;
 }
 
@@ -511,9 +511,9 @@ main {
 }
 
 .tab-button[aria-selected="true"] {
-  opacity: 1;
   font-weight: 600;
   border-bottom-color: Highlight;
+  opacity: 1;
 }
 
 .span-io {
@@ -526,16 +526,16 @@ main {
 }
 
 .span-io .io-section + .io-section {
-  border-top: 1px solid color-mix(in srgb, CanvasText 12%, transparent);
-  margin-top: 4px;
   padding-top: 12px;
+  margin-top: 4px;
+  border-top: 1px solid color-mix(in srgb, CanvasText 12%, transparent);
 }
 
 .io-header {
   display: flex;
+  gap: 8px;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
   padding: 0 0 8px;
 }
 
@@ -550,29 +550,29 @@ main {
 }
 
 .io-view {
+  padding: 2px 6px;
   font: inherit;
   font-size: 11px;
-  padding: 2px 6px;
-  border-radius: 4px;
-  border: 1px solid color-mix(in srgb, CanvasText 20%, transparent);
-  background: Canvas;
   color: inherit;
+  background: Canvas;
+  border: 1px solid color-mix(in srgb, CanvasText 20%, transparent);
+  border-radius: 4px;
 }
 
 .io-body {
-  margin: 0;
   padding: 0;
+  margin: 0;
 }
 
 .io-body.json {
   padding: 8px 10px;
   font-family: ui-monospace, monospace;
   font-size: 11px;
-  white-space: pre-wrap;
   word-break: break-word;
+  white-space: pre-wrap;
+  background: color-mix(in srgb, CanvasText 3%, transparent);
   border: 1px solid color-mix(in srgb, CanvasText 12%, transparent);
   border-radius: 6px;
-  background: color-mix(in srgb, CanvasText 3%, transparent);
 }
 
 .io-body.pretty {
@@ -581,28 +581,28 @@ main {
 }
 
 .message-card {
-  border: 1px solid color-mix(in srgb, CanvasText 12%, transparent);
-  border-radius: 6px;
   padding: 8px 10px;
   background: Canvas;
+  border: 1px solid color-mix(in srgb, CanvasText 12%, transparent);
+  border-radius: 6px;
 }
 
 .message-role {
+  margin-bottom: 4px;
   font-size: 11px;
   font-weight: 600;
-  margin-bottom: 4px;
 }
 
 .message-subtitle {
+  margin: 4px 0 6px;
   font-size: 11px;
   opacity: 0.75;
-  margin: 4px 0 6px;
 }
 
 .message-content {
   font-size: 12px;
-  white-space: pre-wrap;
   word-break: break-word;
+  white-space: pre-wrap;
 }
 
 .role-assistant .message-role {
@@ -615,16 +615,16 @@ main {
 }
 
 .tool-call {
-  margin-top: 6px;
   padding: 8px;
-  border-radius: 4px;
+  margin-top: 6px;
   background: color-mix(in srgb, CanvasText 4%, transparent);
+  border-radius: 4px;
 }
 
 .tool-call-name {
-  font-weight: 600;
-  font-size: 12px;
   margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .tool-call-raw {
@@ -635,10 +635,10 @@ main {
 }
 
 .field-list {
-  margin: 0;
   display: grid;
   grid-template-columns: auto 1fr;
   gap: 2px 12px;
+  margin: 0;
   font-size: 12px;
 }
 
@@ -652,19 +652,19 @@ main {
   margin: 0;
   font-family: ui-monospace, monospace;
   font-size: 11px;
-  white-space: pre-wrap;
   word-break: break-word;
+  white-space: pre-wrap;
 }
 
 .attrs {
-  margin-top: 8px;
   padding: 8px;
-  background: color-mix(in srgb, CanvasText 5%, transparent);
-  border-radius: 4px;
+  margin-top: 8px;
   font-family: ui-monospace, monospace;
   font-size: 11px;
-  white-space: pre-wrap;
   word-break: break-word;
+  white-space: pre-wrap;
+  background: color-mix(in srgb, CanvasText 5%, transparent);
+  border-radius: 4px;
 }
 
 .empty {

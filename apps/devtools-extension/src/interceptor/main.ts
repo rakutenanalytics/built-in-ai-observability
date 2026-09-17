@@ -25,9 +25,9 @@ if (!globals[INSTALLED_KEY]) {
   // Deliberately not calling provider.register(): that would replace the
   // page's own global OpenTelemetry context, which we must not disturb.
   const instrumentation = new PromptApiInstrumentation({
-    tracerProvider: provider,
     captureInput: true,
     captureOutput: true,
+    tracerProvider: provider,
   });
   instrumentation.enable();
 }

@@ -6,33 +6,33 @@ const MLFLOW_OUTPUTS = "mlflow.spanOutputs";
 export type IoView = "pretty" | "json";
 
 export interface PrettyToolCall {
+  arguments?: unknown;
   id?: string;
   name: string;
-  arguments?: unknown;
 }
 
 /** One card in the Pretty view — a user turn, a tool result, or tool calls. */
 export interface PrettyMessage {
-  role: string;
-  title: string;
-  text?: string;
-  toolCalls?: PrettyToolCall[];
   /** Structured tool payload shown as key/value rows when there is no text. */
   fields?: Record<string, unknown>;
+  role: string;
+  text?: string;
+  title: string;
+  toolCalls?: PrettyToolCall[];
 }
 
 export interface IoPayload {
+  /** Tool-span arguments/results without a messages envelope. */
+  fields?: Record<string, unknown>;
   /** Raw JSON for the JSON view. */
   json: string;
   /** Cards for the Pretty view; empty when only structured tool fields apply. */
   messages: PrettyMessage[];
-  /** Tool-span arguments/results without a messages envelope. */
-  fields?: Record<string, unknown>;
 }
 
 interface OpenAiToolCall {
-  id?: string;
   function?: { name?: string; arguments?: string };
+  id?: string;
 }
 
 type GenAiPart = Record<string, unknown>;
@@ -59,7 +59,7 @@ function parseJson(value: string | undefined): unknown {
   try {
     return JSON.parse(value);
   } catch {
-    return;
+    // Preview payloads are not always JSON.
   }
 }
 
@@ -75,7 +75,6 @@ function objectFields(value: unknown): Record<string, unknown> | undefined {
   if (value && typeof value === "object" && !Array.isArray(value)) {
     return value as Record<string, unknown>;
   }
-  return;
 }
 
 function textFromContent(content: unknown): string | undefined {
@@ -96,16 +95,15 @@ function messageArray(parsed: unknown): Record<string, unknown>[] | undefined {
   if (Array.isArray(envelope.messages)) {
     return envelope.messages as Record<string, unknown>[];
   }
-  return;
 }
 
 function mapOpenAiToolCalls(
   raw: OpenAiToolCall[] | undefined
 ): PrettyToolCall[] | undefined {
   return raw?.map((call) => ({
+    arguments: parseArguments(call.function?.arguments),
     id: call.id,
     name: call.function?.name ?? "tool",
-    arguments: parseArguments(call.function?.arguments),
   }));
 }
 
@@ -119,7 +117,7 @@ function openAiMessageCard(
   const text = textFromContent(message.content);
 
   if (toolCalls?.length) {
-    return { role, title: roleTitle(role), text, toolCalls };
+    return { role, text, title: roleTitle(role), toolCalls };
   }
 
   if (role === "tool") {
@@ -129,17 +127,17 @@ function openAiMessageCard(
         : message.content;
     const fields = objectFields(parsedContent);
     return {
-      role,
-      title: "Tool",
-      text: fields ? undefined : text,
       fields,
+      role,
+      text: fields ? undefined : text,
+      title: "Tool",
     };
   }
 
   if (!text) {
     return;
   }
-  return { role, title: roleTitle(role), text };
+  return { role, text, title: roleTitle(role) };
 }
 
 function openAiMessages(parsed: unknown): PrettyMessage[] | undefined {
@@ -158,10 +156,10 @@ function toolResponseCard(part: GenAiPart): PrettyMessage {
   const payload =
     part.error === undefined ? (part.response ?? part) : part.error;
   return {
-    role: "tool",
-    title: "Tool",
-    text: textFromContent(payload),
     fields: objectFields(payload),
+    role: "tool",
+    text: textFromContent(payload),
+    title: "Tool",
   };
 }
 
@@ -176,9 +174,9 @@ function genAiPartCards(part: GenAiPart): {
   if (part.type === "tool_call") {
     return {
       toolCall: {
+        arguments: part.arguments,
         id: typeof part.id === "string" ? part.id : undefined,
         name: String(part.name ?? "tool"),
-        arguments: part.arguments,
       },
     };
   }
@@ -215,9 +213,9 @@ function genAiTurnCards(message: {
   const role = message.role ?? "user";
   const text = textParts.length > 0 ? textParts.join("\n") : undefined;
   if (toolCalls.length > 0) {
-    cards.push({ role, title: roleTitle(role), text, toolCalls });
+    cards.push({ role, text, title: roleTitle(role), toolCalls });
   } else if (text) {
-    cards.push({ role, title: roleTitle(role), text });
+    cards.push({ role, text, title: roleTitle(role) });
   }
   return cards;
 }
@@ -263,12 +261,12 @@ function toolFields(json: string, title: string): IoPayload | undefined {
   const unwrapped = unwrapToolValue(parsed);
   const fields = objectFields(unwrapped);
   if (fields) {
-    return { json, messages: [], fields };
+    return { fields, json, messages: [] };
   }
   // Not a plain object (an array, string, or number) — still worth showing.
   return {
     json,
-    messages: [{ role: "tool", title, text: textFromContent(unwrapped) }],
+    messages: [{ role: "tool", text: textFromContent(unwrapped), title }],
   };
 }
 

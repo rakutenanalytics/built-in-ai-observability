@@ -28,15 +28,15 @@ let spansSincePrune = 0;
  */
 function sourceFromSender(sender: chrome.runtime.MessageSender): SpanSource {
   return {
-    tabId: sender.tab?.id,
     frameId: sender.frameId,
-    url: sender.url,
     origin: sender.origin ?? (sender.url && new URL(sender.url).origin),
+    tabId: sender.tab?.id,
+    url: sender.url,
   };
 }
 
 function notifyPanels(tabId?: number): void {
-  chrome.runtime.sendMessage({ type: TRACES_UPDATED, tabId }).catch(() => {
+  chrome.runtime.sendMessage({ tabId, type: TRACES_UPDATED }).catch(() => {
     // No DevTools panel is open.
   });
 }
@@ -86,7 +86,7 @@ async function handlePanelRequest(
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  const type = (message as { type?: string })?.type;
+  const { type } = message as { type?: string };
   if (!type) {
     return false;
   }

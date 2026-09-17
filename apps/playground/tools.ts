@@ -6,26 +6,26 @@
  */
 
 export interface PlaygroundTool extends LanguageModelToolDeclaration {
-  execute(args: Record<string, unknown>): Promise<unknown>;
+  execute: (args: Record<string, unknown>) => Promise<unknown>;
 }
 
 interface Weather {
-  tempC: number;
-  conditions: string;
   /** Left null on purpose: Chrome rejects a result holding a null anywhere. */
   advisory: string | null;
+  conditions: string;
+  tempC: number;
 }
 
 const WEATHER: Record<string, Weather> = {
-  tokyo: { tempC: 24, conditions: "clear", advisory: null },
-  kyoto: { tempC: 22, conditions: "light rain", advisory: "Take an umbrella." },
-  osaka: { tempC: 26, conditions: "cloudy", advisory: null },
+  kyoto: { advisory: "Take an umbrella.", conditions: "light rain", tempC: 22 },
+  osaka: { advisory: null, conditions: "cloudy", tempC: 26 },
+  tokyo: { advisory: null, conditions: "clear", tempC: 24 },
 };
 
 const CITY_POPULATION: Record<string, number> = {
-  tokyo: 13_960_000,
   kyoto: 1_460_000,
   osaka: 2_750_000,
+  tokyo: 13_960_000,
 };
 
 function cityKey(args: Record<string, unknown>): string {
@@ -34,20 +34,9 @@ function cityKey(args: Record<string, unknown>): string {
 
 export const tools: PlaygroundTool[] = [
   {
-    name: "get_weather",
     description:
       "Get the current weather for a city. Only Tokyo, Kyoto and Osaka " +
       "are known.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        city: {
-          type: "string",
-          description: 'The city name, for example "Tokyo".',
-        },
-      },
-      required: ["city"],
-    },
     execute(args) {
       const weather = WEATHER[cityKey(args)];
       if (!weather) {
@@ -57,20 +46,20 @@ export const tools: PlaygroundTool[] = [
       }
       return Promise.resolve({ city: args.city, ...weather });
     },
-  },
-  {
-    name: "get_population",
-    description: "Get the population of a city.",
     inputSchema: {
-      type: "object",
       properties: {
         city: {
+          description: 'The city name, for example "Tokyo".',
           type: "string",
-          description: 'The city name, for example "Kyoto".',
         },
       },
       required: ["city"],
+      type: "object",
     },
+    name: "get_weather",
+  },
+  {
+    description: "Get the population of a city.",
     execute(args) {
       const people = CITY_POPULATION[cityKey(args)];
       if (people === undefined) {
@@ -78,6 +67,17 @@ export const tools: PlaygroundTool[] = [
       }
       return Promise.resolve({ city: args.city, people });
     },
+    inputSchema: {
+      properties: {
+        city: {
+          description: 'The city name, for example "Kyoto".',
+          type: "string",
+        },
+      },
+      required: ["city"],
+      type: "object",
+    },
+    name: "get_population",
   },
 ];
 

@@ -2,8 +2,8 @@ import type { StoredSpan } from "../storage/indexed-db.js";
 import { contextUtilizationFromAttributes } from "./context-meta.js";
 
 export interface SpanGroups {
-  roots: StoredSpan[];
   childrenByParent: Map<string, StoredSpan[]>;
+  roots: StoredSpan[];
 }
 
 export function groupSpans(spans: StoredSpan[]): SpanGroups {
@@ -20,7 +20,7 @@ export function groupSpans(spans: StoredSpan[]): SpanGroups {
       roots.push(span);
     }
   }
-  return { roots, childrenByParent };
+  return { childrenByParent, roots };
 }
 
 export function descendantSpans(

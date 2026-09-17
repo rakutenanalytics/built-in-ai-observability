@@ -6,10 +6,10 @@ describe("spanInputs", () => {
   it("prefers mlflow OpenAI-shaped messages over gen_ai parts", () => {
     const payload = spanInputs({
       "mlflow.spanInputs": JSON.stringify({
-        messages: [{ role: "user", content: "from mlflow" }],
+        messages: [{ content: "from mlflow", role: "user" }],
       }),
       [GEN_AI.INPUT_MESSAGES]: JSON.stringify([
-        { role: "user", parts: [{ type: "text", content: "from genai" }] },
+        { parts: [{ content: "from genai", type: "text" }], role: "user" },
       ]),
     });
     expect(payload?.messages[0]?.text).toBe("from mlflow");
@@ -19,16 +19,16 @@ describe("spanInputs", () => {
     const payload = spanInputs({
       [GEN_AI.INPUT_MESSAGES]: JSON.stringify([
         {
-          role: "user",
           parts: [
             {
-              type: "tool_call_response",
               name: "get_current_time",
               response: [
                 { type: "object", value: { iso: "2026-09-10T02:25:18.662Z" } },
               ],
+              type: "tool_call_response",
             },
           ],
+          role: "user",
         },
       ]),
     });
@@ -53,16 +53,16 @@ describe("spanOutputs", () => {
       "mlflow.spanOutputs": JSON.stringify({
         messages: [
           {
-            role: "assistant",
             content: null,
+            role: "assistant",
             tool_calls: [
               {
+                function: {
+                  arguments: '{"city":"Kyoto"}',
+                  name: "get_weather",
+                },
                 id: "call-1",
                 type: "function",
-                function: {
-                  name: "get_weather",
-                  arguments: '{"city":"Kyoto"}',
-                },
               },
             ],
           },
@@ -70,20 +70,20 @@ describe("spanOutputs", () => {
       }),
     });
     expect(payload?.messages[0]?.toolCalls?.[0]).toEqual({
+      arguments: { city: "Kyoto" },
       id: "call-1",
       name: "get_weather",
-      arguments: { city: "Kyoto" },
     });
   });
 
   it("falls back to execute_tool results", () => {
     const payload = spanOutputs({
       [GEN_AI.TOOL_CALL_RESULT]: JSON.stringify({
-        tempC: 24,
         conditions: "rainy",
+        tempC: 24,
       }),
     });
-    expect(payload?.fields).toEqual({ tempC: 24, conditions: "rainy" });
+    expect(payload?.fields).toEqual({ conditions: "rainy", tempC: 24 });
   });
 
   it("unwraps the Prompt API's content-part envelope around a result", () => {
@@ -91,10 +91,10 @@ describe("spanOutputs", () => {
     // arguments, which arrive as a plain object.
     const payload = spanOutputs({
       [GEN_AI.TOOL_CALL_RESULT]: JSON.stringify([
-        { type: "object", value: { tempC: 24, conditions: "rainy" } },
+        { type: "object", value: { conditions: "rainy", tempC: 24 } },
       ]),
     });
-    expect(payload?.fields).toEqual({ tempC: 24, conditions: "rainy" });
+    expect(payload?.fields).toEqual({ conditions: "rainy", tempC: 24 });
   });
 
   it("still shows a result that isn't an object after unwrapping", () => {
@@ -105,8 +105,8 @@ describe("spanOutputs", () => {
     });
     expect(payload?.messages[0]).toEqual({
       role: "tool",
-      title: "Result",
       text: "Sunny, 24C",
+      title: "Result",
     });
   });
 });

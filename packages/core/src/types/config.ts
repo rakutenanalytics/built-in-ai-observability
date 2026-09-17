@@ -13,19 +13,19 @@ export const DEFAULT_CAPTURE_CONFIG: CaptureConfig = {
 
 export interface SessionTelemetryMeta {
   conversationId: string;
-  sessionId: string;
   parentSessionId?: string;
+  sessionId: string;
 }
 
 export interface FrameContext {
-  tabId?: number;
   frameId?: number;
-  url?: string;
   origin?: string;
+  tabId?: number;
+  url?: string;
 }
 
 export interface InstrumentationConfig extends CaptureConfig {
-  providerName?: string;
   /** Include MLflow preview attributes for backends that use them. */
   includeMlflowPreview?: boolean;
+  providerName?: string;
 }

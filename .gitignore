@@ -1,6 +1,58 @@
+# Dependencies
 node_modules/
+.pnpm-store/
+
+# Build outputs
 dist/
-.turbo/
+build/
 *.tsbuildinfo
-.DS_Store
+
+# Turborepo
+.turbo/
+
+# Vite
+.vite/
+
+# Test coverage
+coverage/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Logs
 *.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors / IDEs
+.idea/
+*.swp
+*.swo
+*~
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# Local tooling caches
+.cache/
+*.local
+
+# MLflow (playground OTLP testing — see README)
+mlflow.db
+mlflow.db-journal
+mlflow.db-wal
+mlflow.db-shm
+mlruns/
+mlartifacts/
+
+# Chrome DevTools local overrides
+com.chrome.devtools.json

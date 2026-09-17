@@ -1,9 +1,9 @@
 import { WEB_AI } from "../semantic-conventions/attributes.js";
 
 interface LanguageModelSession {
+  contextUsage?: number;
   contextWindow?: number;
   inputQuota?: number;
-  contextUsage?: number;
   inputUsage?: number;
 }
 

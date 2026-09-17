@@ -6,8 +6,8 @@
   "scripts": {
     "build": "tsup && node scripts/copy-static.mjs",
     "dev": "tsup --watch",
-    "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
     "@opentelemetry/resources": "catalog:",

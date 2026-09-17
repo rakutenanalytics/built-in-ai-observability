@@ -12,11 +12,11 @@ const TICK_TARGET_COUNT = 5;
 const NICE_STEPS = [1, 2, 5, 10];
 
 export interface TimelineRow {
-  span: StoredSpan;
   /** Nesting level of the span, 0 for a root. */
   depth: number;
   /** Bar position within the trace window, as a percentage. */
   offsetPct: number;
+  span: StoredSpan;
   /** Bar length within the trace window, as a percentage. */
   widthPct: number;
 }
@@ -53,10 +53,10 @@ export function timelineLayout(
       (a, b) => a.startTimeMs - b.startTimeMs
     )) {
       rows.push({
-        span,
         depth,
         offsetPct:
           totalMs > 0 ? ((span.startTimeMs - start) / totalMs) * PERCENT : 0,
+        span,
         widthPct: totalMs > 0 ? (span.durationMs / totalMs) * PERCENT : 0,
       });
       walk(groups.childrenByParent.get(span.spanId) ?? [], depth + 1);

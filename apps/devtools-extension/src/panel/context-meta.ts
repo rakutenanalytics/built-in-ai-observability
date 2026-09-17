@@ -1,8 +1,8 @@
 import { WEB_AI } from "@web-ai-otel/core";
 
 interface ContextSummary {
-  contextUtilization?: number;
   contextUsage?: number;
+  contextUtilization?: number;
   contextWindow?: number;
 }
 
@@ -30,7 +30,6 @@ export function contextUtilizationFromAttributes(
   if (usage !== undefined && window !== undefined && window > 0) {
     return usage / window;
   }
-  return;
 }
 
 export function contextUtilizationFromSummary(
@@ -46,7 +45,6 @@ export function contextUtilizationFromSummary(
   ) {
     return summary.contextUsage / summary.contextWindow;
   }
-  return;
 }
 
 export function formatContextUtilization(

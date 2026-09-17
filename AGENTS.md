@@ -4,7 +4,7 @@ Instructions for coding agents working on **built-in-ai-observability** — an O
 
 ## Project overview
 
-- **Package manager:** pnpm 10 (see `packageManager` in root `package.json`)
+- **Package manager:** pnpm 12 (see `packageManager` in root `package.json`)
 - **Build orchestration:** Turborepo (`turbo run <task>`)
 - **Lint/format:** Biome via Ultracite rules (`biome.jsonc`)
 - **Tests:** Vitest
@@ -94,7 +94,15 @@ pnpm update -r --latest
 
 Review changes to `pnpm-workspace.yaml`, `pnpm-lock.yaml`, and any resolved catalog versions. Fix breaking changes before finishing.
 
-### 4. Add a new shared dependency
+### 4. pnpm 12 workspace settings
+
+`pnpm-workspace.yaml` also configures:
+
+- `minimumReleaseAge: 0` — allow freshly published packages (early-stage repo)
+- `allowBuilds.esbuild: true` — required for Vite/tsup native binaries
+- `catalog:` — shared dependency versions (see above)
+
+### 5. Add a new shared dependency
 
 1. Add the version to `catalog:` in `pnpm-workspace.yaml`.
 2. Add `"<package>": "catalog:"` to the relevant package's `dependencies` or `devDependencies`.
@@ -106,7 +114,9 @@ pnpm add some-package --filter @web-ai-otel/core
 # Then ensure the version in package.json is "catalog:" and the catalog entry exists
 ```
 
-### 5. Validate after every upgrade
+**TypeScript 7** is not compatible with `tsup` DTS generation yet — keep `typescript` on latest **5.9.x** in the catalog until tsup catches up.
+
+### 6. Validate after every upgrade
 
 Run the full validation suite and fix any failures before completing the task:
 
@@ -124,37 +134,37 @@ One-liner:
 pnpm install && pnpm build && pnpm typecheck && pnpm test && pnpm check
 ```
 
-### 6. Manual smoke tests (when runtime behavior may change)
+### 7. Manual smoke tests (when runtime behavior may change)
 
 ```bash
-# Playground
-pnpm --filter @web-ai-otel/playground dev
-
-# Vanilla example
-pnpm --filter @web-ai-otel/example-vanilla dev
-
-# DevTools extension
-pnpm --filter @web-ai-otel/devtools-extension build
-# Load apps/devtools-extension/dist as an unpacked Chrome extension
+pnpm dev:playground    # playground (Vite)
+pnpm dev:vanilla       # vanilla example
+pnpm build:extension   # then load apps/devtools-extension/dist in Chrome
+pnpm mlflow            # optional: local trace UI at http://localhost:5000/?experiment=0
 ```
 
 ## Running tasks for a single package
 
-```bash
-pnpm --filter @web-ai-otel/core build
-pnpm --filter @web-ai-otel/core test
-pnpm --filter @web-ai-otel/devtools-extension typecheck
-```
+Prefer root scripts when available:
 
-Package names are in each `package.json` `name` field (e.g. `@web-ai-otel/core`, not the directory name).
+| Script | Package |
+| --- | --- |
+| `pnpm dev:playground` | `@web-ai-otel/playground` |
+| `pnpm build:playground` | `@web-ai-otel/playground` |
+| `pnpm dev:vanilla` | `@web-ai-otel/example-vanilla` |
+| `pnpm build:vanilla` | `@web-ai-otel/example-vanilla` |
+| `pnpm dev:extension` | `@web-ai-otel/devtools-extension` |
+| `pnpm build:extension` | `@web-ai-otel/devtools-extension` |
 
-Turborepo filters:
+For other packages, use Turborepo filters:
 
 ```bash
 turbo run build --filter=@web-ai-otel/core
 turbo run test --filter=@web-ai-otel/instrumentation-prompt-api
 turbo run build --affected   # only changed packages + dependents
 ```
+
+Or `pnpm --filter <package-name> <script>` when a root alias does not exist.
 
 ## Testing instructions
 

@@ -9,42 +9,42 @@ import {
 } from "./tools.js";
 
 interface MessagePart {
+  content?: string;
   type: string;
   value?: unknown;
-  content?: string;
 }
 
 interface PromptMessage {
-  role?: string;
   content: string | MessagePart[];
+  role?: string;
 }
 
 interface TextPart {
-  type: "text";
   content: string;
+  type: "text";
 }
 
 interface RedactedPart {
-  type: "redacted";
   /** The original part type, e.g. "image" or "audio". Never the value. */
   modality: string;
+  type: "redacted";
 }
 
 /** A tool the model asked for, in GenAI message form. */
 interface ToolCallPart {
-  type: "tool_call";
+  arguments?: unknown;
   id?: string;
   name: string;
-  arguments?: unknown;
+  type: "tool_call";
 }
 
 /** The page's answer to a call, in GenAI message form. */
 interface ToolCallResponsePart {
-  type: "tool_call_response";
+  error?: string;
   id?: string;
   name: string;
   response?: unknown;
-  error?: string;
+  type: "tool_call_response";
 }
 
 type EncodedPart =
@@ -54,8 +54,8 @@ type EncodedPart =
   | ToolCallResponsePart;
 
 interface EncodedMessage {
-  role: string;
   parts: EncodedPart[];
+  role: string;
 }
 
 interface EncodedOutputMessage extends EncodedMessage {
@@ -63,7 +63,7 @@ interface EncodedOutputMessage extends EncodedMessage {
 }
 
 function toolCallPart(call: ToolCallInfo): ToolCallPart {
-  const part: ToolCallPart = { type: "tool_call", name: call.name };
+  const part: ToolCallPart = { name: call.name, type: "tool_call" };
   // Chrome leaves the id empty, and an empty string reads as a real value.
   if (call.id) {
     part.id = call.id;
@@ -76,8 +76,8 @@ function toolCallPart(call: ToolCallInfo): ToolCallPart {
 
 function toolResponsePart(response: ToolResponseInfo): ToolCallResponsePart {
   const part: ToolCallResponsePart = {
-    type: "tool_call_response",
     name: response.name,
+    type: "tool_call_response",
   };
   if (response.id) {
     part.id = response.id;
@@ -95,12 +95,12 @@ function textPartFrom(part: MessagePart): TextPart | undefined {
   if (part.type !== "text") {
     return;
   }
-  return { type: "text", content: String(part.value ?? part.content ?? "") };
+  return { content: String(part.value ?? part.content ?? ""), type: "text" };
 }
 
 function textPartsFrom(content: string | MessagePart[]): TextPart[] {
   if (typeof content === "string") {
-    return [{ type: "text", content }];
+    return [{ content, type: "text" }];
   }
   if (!Array.isArray(content)) {
     return [];
@@ -114,12 +114,12 @@ export function encodeInputMessages(
   input: string | PromptMessage | PromptMessage[]
 ): EncodedMessage[] {
   if (typeof input === "string") {
-    return [{ role: "user", parts: [{ type: "text", content: input }] }];
+    return [{ parts: [{ content: input, type: "text" }], role: "user" }];
   }
   const messages = Array.isArray(input) ? input : [input];
   return messages.map((message) => ({
-    role: message.role ?? "user",
     parts: encodeParts(message.content),
+    role: message.role ?? "user",
   }));
 }
 
@@ -141,12 +141,12 @@ function encodePart(part: MessagePart): EncodedPart {
     }
   }
   // Other modalities are recorded by kind only, never by value.
-  return { type: "redacted", modality: part.type };
+  return { modality: part.type, type: "redacted" };
 }
 
 function encodeParts(content: string | MessagePart[]): EncodedPart[] {
   if (typeof content === "string") {
-    return [{ type: "text", content }];
+    return [{ content, type: "text" }];
   }
   if (!Array.isArray(content)) {
     return [];
@@ -158,7 +158,7 @@ function outputParts(turn: AssistantTurn): EncodedPart[] {
   const parts: EncodedPart[] = [];
   // A turn that only asks for tools has no text, and gets no empty text part.
   if (turn.text) {
-    parts.push({ type: "text", content: turn.text });
+    parts.push({ content: turn.text, type: "text" });
   }
   for (const call of turn.toolCalls) {
     parts.push(toolCallPart(call));
@@ -172,9 +172,9 @@ export function encodeOutputMessages(
 ): EncodedOutputMessage[] {
   const parts: EncodedPart[] =
     typeof output === "string"
-      ? [{ type: "text", content: output }]
+      ? [{ content: output, type: "text" }]
       : outputParts(output);
-  return [{ role: "assistant", parts, finish_reason: finishReason }];
+  return [{ finish_reason: finishReason, parts, role: "assistant" }];
 }
 
 export function encodeSystemInstructions(
@@ -187,15 +187,15 @@ export function encodeSystemInstructions(
 }
 
 interface OpenAiToolCall {
-  id?: string;
-  type: string;
   /** OpenAI carries arguments as a JSON string, not as an object. */
   function: { name: string; arguments?: string };
+  id?: string;
+  type: string;
 }
 
 interface OpenAiMessage {
-  role: string;
   content: string | null;
+  role: string;
   tool_call_id?: string;
   tool_calls?: OpenAiToolCall[];
 }
@@ -204,14 +204,14 @@ function safeJson(value: unknown): string | undefined {
   try {
     return JSON.stringify(value);
   } catch {
-    return;
+    // Message parts are not always JSON-serializable.
   }
 }
 
 function openAiToolCall(part: ToolCallPart): OpenAiToolCall {
   const call: OpenAiToolCall = {
+    function: { arguments: safeJson(part.arguments ?? {}), name: part.name },
     type: TOOL_TYPE_FUNCTION,
-    function: { name: part.name, arguments: safeJson(part.arguments ?? {}) },
   };
   if (part.id) {
     call.id = part.id;
@@ -222,9 +222,9 @@ function openAiToolCall(part: ToolCallPart): OpenAiToolCall {
 /** A result is its own message here, whatever role the Prompt API used. */
 function openAiToolMessage(part: ToolCallResponsePart): OpenAiMessage {
   const message: OpenAiMessage = {
-    role: "tool",
     content:
       safeJson(part.error === undefined ? part.response : part.error) ?? null,
+    role: "tool",
   };
   if (part.id) {
     message.tool_call_id = part.id;
@@ -265,8 +265,8 @@ function openAiMessages(message: {
     return toolMessages;
   }
   const entry: OpenAiMessage = {
-    role: message.role,
     content: text.join("\n") || null,
+    role: message.role,
   };
   if (toolCalls.length > 0) {
     entry.tool_calls = toolCalls;

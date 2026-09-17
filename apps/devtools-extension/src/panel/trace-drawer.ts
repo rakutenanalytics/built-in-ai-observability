@@ -13,15 +13,15 @@ import {
 import { buildSpanBrowser } from "./span-browser.js";
 
 export interface TraceDrawer {
+  close: () => void;
   /** Shows `traces[index]`, replacing whatever the drawer held before. */
-  open(traces: TraceSummary[], index: number): void;
-  close(): void;
+  open: (traces: TraceSummary[], index: number) => void;
+  openTraceId: () => string | undefined;
   /**
    * Keeps an open drawer in step with a reloaded list: the trace may have
    * grown spans, moved position, or disappeared entirely.
    */
-  refresh(traces: TraceSummary[]): void;
-  openTraceId(): string | undefined;
+  refresh: (traces: TraceSummary[]) => void;
 }
 
 function traceSummaryLine(trace: TraceSummary): string {
@@ -137,6 +137,7 @@ export function createTraceDrawer(
   close.addEventListener("click", closeDrawer);
 
   return {
+    close: closeDrawer,
     open(nextTraces: TraceSummary[], nextIndex: number): void {
       traces = nextTraces;
       if (element.hidden) {
@@ -147,7 +148,9 @@ export function createTraceDrawer(
       show(nextIndex);
       element.focus();
     },
-    close: closeDrawer,
+    openTraceId(): string | undefined {
+      return element.hidden ? undefined : traces[index]?.traceId;
+    },
     refresh(nextTraces: TraceSummary[]): void {
       if (element.hidden) {
         traces = nextTraces;
@@ -171,9 +174,6 @@ export function createTraceDrawer(
         previous.disabled = index <= 0;
         next.disabled = index >= nextTraces.length - 1;
       }
-    },
-    openTraceId(): string | undefined {
-      return element.hidden ? undefined : traces[index]?.traceId;
     },
   };
 }

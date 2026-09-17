@@ -32,33 +32,33 @@ const EXECUTE_TOOL_OPERATION = "execute_tool";
 
 /** A span plus the attribution the extension derived from the sender. */
 export interface StoredSpan extends SerializedSpan {
-  source: SpanSource;
-  startTimeMs: number;
-  durationMs: number;
   /** Denormalized for indexing; IndexedDB keyPaths cannot contain dots. */
   conversationId?: string;
+  durationMs: number;
+  source: SpanSource;
+  startTimeMs: number;
 }
 
 export interface TraceSummary {
-  traceId: string;
-  rootSpanName: string;
-  startTimeMs: number;
-  endTimeMs: number;
-  durationMs: number;
-  spanCount: number;
-  origin: string;
-  url?: string;
-  tabId?: number;
-  statusCode: number;
+  contextUsage?: number;
+  contextUtilization?: number;
+  contextWindow?: number;
   conversationId?: string;
-  /** `execute_tool` spans in the trace, so a tool exchange reads as one. */
-  toolCallCount: number;
+  durationMs: number;
+  endTimeMs: number;
+  origin: string;
   /** The question and the answer, both taken from the root span. */
   request?: string;
   response?: string;
-  contextWindow?: number;
-  contextUsage?: number;
-  contextUtilization?: number;
+  rootSpanName: string;
+  spanCount: number;
+  startTimeMs: number;
+  statusCode: number;
+  tabId?: number;
+  /** `execute_tool` spans in the trace, so a tool exchange reads as one. */
+  toolCallCount: number;
+  traceId: string;
+  url?: string;
 }
 
 /**
@@ -66,25 +66,25 @@ export interface TraceSummary {
  * One `LanguageModel` session (plus any clones of it) maps to one of these.
  */
 export interface SessionSummary {
+  contextUsage?: number;
+  contextUtilization?: number;
+  contextWindow?: number;
   conversationId: string;
-  tabId?: number;
-  origin: string;
-  url?: string;
-  startTimeMs: number;
-  endTimeMs: number;
   durationMs: number;
-  traceIds: string[];
-  spanCount: number;
-  turnCount: number;
+  endTimeMs: number;
   errorCount: number;
-  toolCallCount: number;
+  origin: string;
   /** First captured user text; absent when content capture is off. */
   request?: string;
   /** Most recent captured assistant text. */
   response?: string;
-  contextWindow?: number;
-  contextUsage?: number;
-  contextUtilization?: number;
+  spanCount: number;
+  startTimeMs: number;
+  tabId?: number;
+  toolCallCount: number;
+  traceIds: string[];
+  turnCount: number;
+  url?: string;
 }
 
 function contextFromSpan(span: StoredSpan): {
@@ -93,9 +93,9 @@ function contextFromSpan(span: StoredSpan): {
   contextUtilization?: number;
 } {
   return {
-    contextWindow: numberAttr(span, CONTEXT_WINDOW),
     contextUsage: numberAttr(span, CONTEXT_USAGE_AFTER),
     contextUtilization: numberAttr(span, CONTEXT_UTILIZATION_AFTER),
+    contextWindow: numberAttr(span, CONTEXT_WINDOW),
   };
 }
 
@@ -111,10 +111,10 @@ function mergeContext<
 ): Pick<T, "contextWindow" | "contextUsage" | "contextUtilization"> {
   const latest = contextFromSpan(span);
   return {
-    contextWindow: latest.contextWindow ?? existing?.contextWindow,
     contextUsage: latest.contextUsage ?? existing?.contextUsage,
     contextUtilization:
       latest.contextUtilization ?? existing?.contextUtilization,
+    contextWindow: latest.contextWindow ?? existing?.contextWindow,
   };
 }
 
@@ -238,9 +238,9 @@ function rootContent(span: StoredSpan): Partial<TraceSummary> {
     return {};
   }
   return {
-    rootSpanName: span.name,
     request: previewFrom(stringAttr(span, INPUT_MESSAGES)),
     response: previewFrom(stringAttr(span, OUTPUT_MESSAGES)),
+    rootSpanName: span.name,
   };
 }
 
@@ -251,18 +251,18 @@ function mergeTrace(
 ): TraceSummary {
   if (!existing) {
     return {
-      traceId: span.traceId,
-      rootSpanName: span.name,
-      startTimeMs: span.startTimeMs,
-      endTimeMs,
-      durationMs: span.durationMs,
-      spanCount: 1,
-      origin: originOf(span),
-      url: span.source.url ?? span.frame?.url,
-      tabId: span.source.tabId,
-      statusCode: span.status.code,
       conversationId: span.conversationId,
+      durationMs: span.durationMs,
+      endTimeMs,
+      origin: originOf(span),
+      rootSpanName: span.name,
+      spanCount: 1,
+      startTimeMs: span.startTimeMs,
+      statusCode: span.status.code,
+      tabId: span.source.tabId,
       toolCallCount: countOf(isToolSpan(span)),
+      traceId: span.traceId,
+      url: span.source.url ?? span.frame?.url,
       ...rootContent(span),
       ...contextFromSpan(span),
     };
@@ -272,13 +272,13 @@ function mergeTrace(
   const mergedEnd = Math.max(existing.endTimeMs, endTimeMs);
   return {
     ...existing,
-    startTimeMs,
-    endTimeMs: mergedEnd,
+    conversationId: existing.conversationId ?? span.conversationId,
     durationMs: mergedEnd - startTimeMs,
+    endTimeMs: mergedEnd,
     spanCount: existing.spanCount + 1,
+    startTimeMs,
     // SpanStatusCode orders UNSET < OK < ERROR, so this surfaces failures.
     statusCode: Math.max(existing.statusCode, span.status.code),
-    conversationId: existing.conversationId ?? span.conversationId,
     toolCallCount: existing.toolCallCount + countOf(isToolSpan(span)),
     // The root arrives last, since it cannot end before what it holds.
     ...rootContent(span),
@@ -293,19 +293,19 @@ function newSession(
 ): SessionSummary {
   return {
     conversationId,
-    tabId: span.source.tabId,
-    origin: originOf(span),
-    url: span.source.url ?? span.frame?.url,
-    startTimeMs: span.startTimeMs,
-    endTimeMs,
     durationMs: span.durationMs,
-    traceIds: [span.traceId],
-    spanCount: 1,
-    turnCount: countOf(span.name === TURN_SPAN_NAME),
+    endTimeMs,
     errorCount: countOf(span.status.code === SPAN_STATUS_ERROR),
-    toolCallCount: countOf(isToolSpan(span)),
+    origin: originOf(span),
     request: previewFrom(stringAttr(span, INPUT_MESSAGES)),
     response: previewFrom(stringAttr(span, OUTPUT_MESSAGES)),
+    spanCount: 1,
+    startTimeMs: span.startTimeMs,
+    tabId: span.source.tabId,
+    toolCallCount: countOf(isToolSpan(span)),
+    traceIds: [span.traceId],
+    turnCount: countOf(span.name === TURN_SPAN_NAME),
+    url: span.source.url ?? span.frame?.url,
     ...contextFromSpan(span),
   };
 }
@@ -328,19 +328,19 @@ function mergeSession(
 
   return {
     ...existing,
-    startTimeMs,
-    endTimeMs: mergedEnd,
     durationMs: mergedEnd - startTimeMs,
-    traceIds,
-    spanCount: existing.spanCount + 1,
-    turnCount: existing.turnCount + countOf(span.name === TURN_SPAN_NAME),
+    endTimeMs: mergedEnd,
     errorCount:
       existing.errorCount + countOf(span.status.code === SPAN_STATUS_ERROR),
-    toolCallCount: existing.toolCallCount + countOf(isToolSpan(span)),
     // Keep the opening request, but track the latest response.
     request: existing.request ?? previewFrom(stringAttr(span, INPUT_MESSAGES)),
     response:
       previewFrom(stringAttr(span, OUTPUT_MESSAGES)) ?? existing.response,
+    spanCount: existing.spanCount + 1,
+    startTimeMs,
+    toolCallCount: existing.toolCallCount + countOf(isToolSpan(span)),
+    traceIds,
+    turnCount: existing.turnCount + countOf(span.name === TURN_SPAN_NAME),
     ...mergeContext(existing, span),
   };
 }
@@ -355,11 +355,11 @@ export async function storeSpan(
 
   const record: StoredSpan = {
     ...span,
-    source,
-    startTimeMs,
-    durationMs: endTimeMs - startTimeMs,
     conversationId:
       stringAttr(span, CONVERSATION_ID) ?? stringAttr(span, SESSION_ID),
+    durationMs: endTimeMs - startTimeMs,
+    source,
+    startTimeMs,
   };
 
   const tx = db.transaction(
@@ -425,8 +425,8 @@ function pruneOldest(
 }
 
 export interface PruneOptions {
-  maxTraces?: number;
   maxSessions?: number;
+  maxTraces?: number;
 }
 
 /** Drops the oldest traces (with their spans) and sessions beyond the caps. */

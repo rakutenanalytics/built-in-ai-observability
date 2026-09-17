@@ -1,9 +1,9 @@
 import { readAssistantTurn, WebAISDK } from "@web-ai-otel/sdk-browser";
 
 const sdk = new WebAISDK({
-  serviceName: "vanilla-example",
   captureInput: false,
   captureOutput: false,
+  serviceName: "vanilla-example",
 });
 await sdk.start();
 

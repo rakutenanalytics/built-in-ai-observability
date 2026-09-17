@@ -16,28 +16,28 @@ function serializeSpan(span: ReadableSpan): SerializedSpan {
   }
 
   return {
-    protocolVersion: PROTOCOL_VERSION,
-    traceId: span.spanContext().traceId,
-    spanId: span.spanContext().spanId,
-    parentSpanId: span.parentSpanContext?.spanId,
-    name: span.name,
-    kind: span.kind,
-    startTime: span.startTime,
-    endTime: span.endTime,
     attributes: attrs,
+    endTime: span.endTime,
     events: span.events.map((event) => ({
+      attributes: event.attributes ? { ...event.attributes } : undefined,
       name: event.name,
       time: event.time,
-      attributes: event.attributes ? { ...event.attributes } : undefined,
     })),
+    frame: {
+      origin: globalThis.location?.origin,
+      url: globalThis.location?.href,
+    },
+    kind: span.kind,
+    name: span.name,
+    parentSpanId: span.parentSpanContext?.spanId,
+    protocolVersion: PROTOCOL_VERSION,
+    spanId: span.spanContext().spanId,
+    startTime: span.startTime,
     status: {
       code: span.status.code,
       message: span.status.message,
     },
-    frame: {
-      url: globalThis.location?.href,
-      origin: globalThis.location?.origin,
-    },
+    traceId: span.spanContext().traceId,
   };
 }
 
@@ -65,9 +65,9 @@ export class ExtensionSpanExporter implements SpanExporter {
       for (const span of spans) {
         const payload = serializeSpan(span);
         this.postMessage({
+          payload,
           source: MESSAGE_SOURCE,
           type: SPAN_MESSAGE_TYPE,
-          payload,
         });
       }
       resultCallback({ code: ExportResultCode.SUCCESS });

@@ -15,7 +15,7 @@ interface LabeledView {
 
 function buildViewToggle(entries: LabeledView[]): {
   element: HTMLElement;
-  show(index: number): void;
+  show: (index: number) => void;
 } {
   const element = el("div", "view-toggle");
   element.setAttribute("role", "group");

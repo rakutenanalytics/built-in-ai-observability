@@ -29,7 +29,7 @@ window.addEventListener("message", (event) => {
 
   try {
     chrome.runtime
-      .sendMessage({ type: BRIDGE_TYPE, payload: span })
+      .sendMessage({ payload: span, type: BRIDGE_TYPE })
       .catch(() => {
         // Background worker may be restarting.
       });

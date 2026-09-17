@@ -48,8 +48,8 @@ describe("ExtensionSpanExporter", () => {
   it("emits one validated message per finished span", () => {
     const tracer = provider.getTracer("test");
     const span = tracer.startSpan("generate_content", {
-      kind: SpanKind.INTERNAL,
       attributes: { "gen_ai.provider.name": "google.chrome" },
+      kind: SpanKind.INTERNAL,
     });
     span.addEvent("web_ai.context_overflow", { "web_ai.context.usage": 10 });
     span.setStatus({ code: SpanStatusCode.OK });

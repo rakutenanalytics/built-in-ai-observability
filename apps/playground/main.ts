@@ -40,14 +40,14 @@ if (modeInfo) {
 
 if (USE_SDK) {
   const sdk = new WebAISDK({
-    serviceName: "playground",
-    otlpUrl,
-    otlpHeaders,
     captureInput: true,
     captureOutput: true,
     // MLflow builds its list previews and chat view from these; other backends
     // read the GenAI attributes and do not need them.
     includeMlflowPreview: Boolean(experimentId),
+    otlpHeaders,
+    otlpUrl,
+    serviceName: "playground",
   });
   await sdk.start();
 }
@@ -58,10 +58,10 @@ if ("LanguageModel" in globalThis) {
   async function ensureSession(): Promise<LanguageModel> {
     if (!session) {
       session = await LanguageModel.create({
-        expectedInputs: [{ type: "text", languages: ["en"] }],
-        expectedOutputs: [{ type: "text", languages: ["en"] }],
+        expectedInputs: [{ languages: ["en"], type: "text" }],
+        expectedOutputs: [{ languages: ["en"], type: "text" }],
         initialPrompts: [
-          { role: "system", content: "You are a helpful assistant." },
+          { content: "You are a helpful assistant.", role: "system" },
         ],
       });
     }
@@ -100,7 +100,7 @@ if ("LanguageModel" in globalThis) {
       }
     }
 
-    return { text, calls };
+    return { calls, text };
   }
 
   let toolSession: LanguageModel | null = null;
@@ -109,16 +109,16 @@ if ("LanguageModel" in globalThis) {
     if (!toolSession) {
       toolSession = await LanguageModel.create({
         expectedInputs: [
-          { type: "text", languages: ["en"] },
+          { languages: ["en"], type: "text" },
           { type: "tool-response" },
           { type: "tool-call" },
         ],
         expectedOutputs: [
-          { type: "text", languages: ["en"] },
+          { languages: ["en"], type: "text" },
           { type: "tool-call" },
         ],
+        initialPrompts: [{ content: TOOL_SYSTEM_PROMPT, role: "system" }],
         tools,
-        initialPrompts: [{ role: "system", content: TOOL_SYSTEM_PROMPT }],
       });
     }
     return toolSession;
@@ -133,8 +133,8 @@ if ("LanguageModel" in globalThis) {
       // itself instead of the turn dying.
       return new LanguageModelToolError({
         callID: call.callID,
-        name: call.name,
         errorMessage: `There is no tool named ${call.name}.`,
+        name: call.name,
       });
     }
 
@@ -148,8 +148,8 @@ if ("LanguageModel" in globalThis) {
     } catch (err) {
       return new LanguageModelToolError({
         callID: call.callID,
-        name: call.name,
         errorMessage: err instanceof Error ? err.message : String(err),
+        name: call.name,
       });
     }
   }
@@ -189,7 +189,7 @@ if ("LanguageModel" in globalThis) {
         render();
         responses.push({ type: "tool-response", value: await runTool(call) });
       }
-      input = [{ role: "user", content: responses }];
+      input = [{ content: responses, role: "user" }];
     }
 
     log.push(`Stopped after ${MAX_TOOL_ROUNDS} tool rounds.`);
