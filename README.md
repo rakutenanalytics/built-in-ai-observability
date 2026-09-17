@@ -6,38 +6,67 @@ Browser-local AI runs inside the page. Network-level observability never sees th
 
 ## Two usage modes
 
-```
-Production SDK                    Chrome DevTools extension
-      │                                    │
-      ▼                                    ▼
- same @web-ai-otel/instrumentation-prompt-api
-      │                                    │
-      ▼                                    ▼
- OpenTelemetry spans              OpenTelemetry spans
-      │                                    │
-      ▼                                    ▼
- OTLP exporter                   IndexedDB + trace explorer
-      │                                    │
-      ▼                                    ▼
- Collector / MLflow / …           Export JSON / OTLP
+Both paths share `@web-ai-otel/instrumentation-prompt-api` and emit standard OpenTelemetry spans; they diverge at export.
+
+```mermaid
+flowchart TB
+  subgraph shared ["Shared instrumentation"]
+    INST["@web-ai-otel/instrumentation-prompt-api"]
+  end
+
+  subgraph sdk ["Production SDK"]
+    SDK["@web-ai-otel/sdk-browser"]
+    OTLP["BatchSpanProcessor → OTLP/HTTP"]
+    BACKEND["Collector / MLflow / …"]
+  end
+
+  subgraph ext ["Chrome DevTools extension (zero-code)"]
+    INT["interceptor.js<br/>(MAIN world @ document_start)"]
+    TRANSPORT["@web-ai-otel/extension-transport"]
+    PIPELINE["postMessage → bridge.js → background.js → IndexedDB"]
+    PANEL["AI Traces DevTools panel"]
+    JSON["Export JSON download"]
+  end
+
+  INST --> SDK --> OTLP --> BACKEND
+  INST --> INT --> TRANSPORT --> PIPELINE --> PANEL --> JSON
 ```
 
 ## Architecture
 
-```text
-Web AI APIs (LanguageModel, …)
-        │
-        ▼
-Shared instrumentation packages
-        │
-        ▼
-OpenTelemetry API (spans, events, attributes)
-        │
-   ┌────┴────┐
-   │         │
- SDK     Extension MAIN-world injector
-   │         │
- OTLP    Extension transport → IndexedDB → DevTools panel
+```mermaid
+flowchart TB
+  subgraph apis ["Web AI APIs"]
+    LM["LanguageModel (Prompt API)"]
+    FUTURE["Other Web AI APIs (planned)"]
+  end
+
+  subgraph libs ["Shared libraries"]
+    CORE["@web-ai-otel/core<br/>conventions · attrs · encoding"]
+    PROMPT["@web-ai-otel/instrumentation-prompt-api"]
+  end
+
+  OTEL["OpenTelemetry spans<br/>(GenAI + web_ai.* attributes)"]
+
+  subgraph sdkExport ["SDK export path"]
+    SDK["@web-ai-otel/sdk-browser"]
+    OTLP["OTLP/HTTP exporter"]
+  end
+
+  subgraph extExport ["Extension export path"]
+    TRANSPORT["@web-ai-otel/extension-transport"]
+    BRIDGE["bridge.js → background.js"]
+    STORE["IndexedDB"]
+    UI["@web-ai-otel/devtools-extension<br/>AI Traces panel"]
+  end
+
+  LM --> PROMPT
+  FUTURE -.-> PROMPT
+  CORE --> PROMPT
+  PROMPT --> OTEL
+
+  OTEL --> SDK --> OTLP
+  OTEL --> TRANSPORT --> BRIDGE --> STORE --> UI
 ```
 
 OpenTelemetry is the canonical telemetry model. MLflow, Langfuse, Grafana, Phoenix, and other backends are export destinations, not internal trace formats.
@@ -170,7 +199,7 @@ Conversation-level context comes from the **session**, which spans more than one
 
 The DevTools panel therefore lists every trace newest first — root span name, request/response previews, span count, tool calls and duration — with a **Group by session** toggle that collapses them under their `gen_ai.conversation.id`, each group showing turn count, duration, context-window usage and errors. This follows MLflow, which retired its separate sessions view in favour of the same toggle. Spans without a conversation (such as `web_ai.check_availability`) stay listed on their own when grouped.
 
-Selecting a trace opens it in a drawer over the list, so the request and response get the full panel width even when DevTools is docked to the side. The drawer stacks a span timeline above the detail of the selected span: one row per span with a proportional bar against the trace's own window, nesting shown by indentation, and arrows in the header to step through neighbouring traces. A nested list is available as an alternative view, and a single-span trace skips the section entirely.
+Selecting a trace opens a slide-in detail sheet over the list (with a dimmed list peek on the left), so the request and response get most of the panel width even when DevTools is docked to the side. The sheet stacks a span timeline above the detail of the selected span: one row per span with a proportional bar against the trace's own window, nesting shown by indentation, and arrows in the header to step through neighbouring traces. A nested list is available as an alternative view, and a single-span trace skips the section entirely.
 
 The list is scoped to the tab you are inspecting, and the header shows which tab and origin that is.
 
