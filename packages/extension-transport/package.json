@@ -26,11 +26,11 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@opentelemetry/api": "^1.9.0",
-    "@opentelemetry/core": "^2.1.0",
-    "@opentelemetry/sdk-trace-base": "^2.1.0"
+    "@opentelemetry/api": "catalog:",
+    "@opentelemetry/core": "catalog:",
+    "@opentelemetry/sdk-trace-base": "catalog:"
   },
   "devDependencies": {
-    "vitest": "^3.2.7"
+    "vitest": "catalog:"
   }
 }

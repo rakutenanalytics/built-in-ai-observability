@@ -12,7 +12,7 @@
     "@web-ai-otel/sdk-browser": "workspace:*"
   },
   "devDependencies": {
-    "typescript": "^5.9.2",
-    "vite": "^6.3.5"
+    "typescript": "catalog:",
+    "vite": "catalog:"
   }
 }

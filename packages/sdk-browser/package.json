@@ -22,11 +22,11 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@opentelemetry/api": "^1.9.0",
-    "@opentelemetry/exporter-trace-otlp-http": "^0.205.0",
-    "@opentelemetry/resources": "^2.1.0",
-    "@opentelemetry/sdk-trace-base": "^2.1.0",
-    "@opentelemetry/sdk-trace-web": "^2.1.0",
+    "@opentelemetry/api": "catalog:",
+    "@opentelemetry/exporter-trace-otlp-http": "catalog:",
+    "@opentelemetry/resources": "catalog:",
+    "@opentelemetry/sdk-trace-base": "catalog:",
+    "@opentelemetry/sdk-trace-web": "catalog:",
     "@web-ai-otel/core": "workspace:*",
     "@web-ai-otel/instrumentation-prompt-api": "workspace:*"
   }

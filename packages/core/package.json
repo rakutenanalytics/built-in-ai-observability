@@ -22,9 +22,9 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@opentelemetry/api": "^1.9.0"
+    "@opentelemetry/api": "catalog:"
   },
   "devDependencies": {
-    "vitest": "^3.2.7"
+    "vitest": "catalog:"
   }
 }

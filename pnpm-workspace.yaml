@@ -2,3 +2,21 @@ packages:
   - "packages/*"
   - "apps/*"
   - "examples/*"
+
+catalog:
+  "@biomejs/biome": ^2.5.14
+  "@opentelemetry/api": ^1.9.1
+  "@opentelemetry/core": ^2.11.0
+  "@opentelemetry/exporter-trace-otlp-http": ^0.205.0
+  "@opentelemetry/resources": ^2.11.0
+  "@opentelemetry/sdk-trace-base": ^2.11.0
+  "@opentelemetry/sdk-trace-web": ^2.11.0
+  "@types/chrome": ^0.0.304
+  "@types/node": ^22.20.3
+  fake-indexeddb: ^6.2.5
+  tsup: ^8.5.1
+  turbo: ^2.10.13
+  typescript: ^5.9.3
+  ultracite: ^6.5.1
+  vite: ^6.4.3
+  vitest: ^3.2.7

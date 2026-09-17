@@ -13,13 +13,13 @@
     "typecheck": "turbo run typecheck"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.3.8",
-    "@types/chrome": "^0.0.304",
-    "@types/node": "^22.15.29",
-    "tsup": "^8.5.0",
-    "turbo": "^2.5.4",
-    "typescript": "^5.8.3",
-    "ultracite": "^6.0.3",
-    "vitest": "^3.2.1"
+    "@biomejs/biome": "catalog:",
+    "@types/chrome": "catalog:",
+    "@types/node": "catalog:",
+    "tsup": "catalog:",
+    "turbo": "catalog:",
+    "typescript": "catalog:",
+    "ultracite": "catalog:",
+    "vitest": "catalog:"
   }
 }

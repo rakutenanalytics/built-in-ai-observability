@@ -22,11 +22,11 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/api": "catalog:",
     "@web-ai-otel/core": "workspace:*"
   },
   "devDependencies": {
-    "@opentelemetry/sdk-trace-base": "^2.1.0",
-    "vitest": "^3.2.7"
+    "@opentelemetry/sdk-trace-base": "catalog:",
+    "vitest": "catalog:"
   }
 }

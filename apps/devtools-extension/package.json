@@ -10,16 +10,16 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@opentelemetry/resources": "^2.1.0",
-    "@opentelemetry/sdk-trace-base": "^2.1.0",
-    "@opentelemetry/sdk-trace-web": "^2.1.0",
+    "@opentelemetry/resources": "catalog:",
+    "@opentelemetry/sdk-trace-base": "catalog:",
+    "@opentelemetry/sdk-trace-web": "catalog:",
     "@web-ai-otel/core": "workspace:*",
     "@web-ai-otel/extension-transport": "workspace:*",
     "@web-ai-otel/instrumentation-prompt-api": "workspace:*"
   },
   "devDependencies": {
-    "@types/chrome": "^0.0.304",
-    "fake-indexeddb": "^6.0.0",
-    "vitest": "^3.2.7"
+    "@types/chrome": "catalog:",
+    "fake-indexeddb": "catalog:",
+    "vitest": "catalog:"
   }
 }
