@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Instructions for coding agents working on **built-in-ai-observability** — an OpenTelemetry instrumentation monorepo for browser Web AI APIs (Prompt API / `LanguageModel`).
+Instructions for coding agents working on **built-in-ai-observability** — an OpenTelemetry instrumentation monorepo for browser Built-in AI APIs (Prompt API / `LanguageModel`).
 
 ## Project overview
 

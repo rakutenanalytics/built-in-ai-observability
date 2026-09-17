@@ -2,7 +2,7 @@
   "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
   "extends": ["ultracite/biome/core"],
   "javascript": {
-    // Web AI APIs and the extension platform are ambient globals. The tool
+    // Built-in AI APIs and the extension platform are ambient globals. The tool
     // interfaces exist only behind chrome://flags/#prompt-api-tool-use.
     "globals": [
       "LanguageModel",

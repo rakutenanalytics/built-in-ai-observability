@@ -25,7 +25,7 @@ export const GEN_AI = {
   TOOL_TYPE: "gen_ai.tool.type",
 } as const;
 
-/** Experimental Web AI attributes not covered by standard OTel conventions. */
+/** Experimental Built-in AI attributes not covered by standard OTel conventions. */
 export const WEB_AI = {
   API_NAME: "web_ai.api.name",
   AVAILABILITY_STATUS: "web_ai.availability.status",

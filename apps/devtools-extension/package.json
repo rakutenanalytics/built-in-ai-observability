@@ -2,7 +2,7 @@
   "name": "@web-ai-otel/devtools-extension",
   "version": "0.1.0",
   "private": true,
-  "description": "Chrome DevTools extension for zero-code Web AI tracing",
+  "description": "Chrome DevTools extension for zero-code Built-in AI tracing",
   "type": "module",
   "scripts": {
     "build": "tsdown",

@@ -1,4 +1,4 @@
-# Implementation proposal: Web AI OpenTelemetry monorepo
+# Implementation proposal: Built-in AI OpenTelemetry monorepo
 
 Discovery based on `web-ai-demos/prompt-api-observability/` (PoC).
 
@@ -78,7 +78,7 @@ Standard attributes on inference spans: `gen_ai.provider.name`, `gen_ai.conversa
 
 **Unset by design:** `gen_ai.request.model`, `gen_ai.usage.*` (Prompt API has no model id or per-request token counts).
 
-## 6. Experimental Web AI attributes
+## 6. Experimental Built-in AI attributes
 
 | Attribute | Why |
 | --- | --- |
@@ -91,7 +91,7 @@ Standard attributes on inference spans: `gen_ai.provider.name`, `gen_ai.conversa
 | `web_ai.session.expected_inputs/outputs` | Session modality config |
 | `web_ai.runtime.browser.name/version` | Runtime identity (also `browser.*` where standard) |
 | `web_ai.runtime.device_memory_gib` | Coarse hardware hint |
-| `web_ai.session.id` | Stable Web AI session id (maps to `gen_ai.conversation.id`) |
+| `web_ai.session.id` | Stable Built-in AI session id (maps to `gen_ai.conversation.id`) |
 | `web_ai.session.parent_id` | Clone parent linkage |
 | `web_ai.availability.status` | Result of `availability()` |
 

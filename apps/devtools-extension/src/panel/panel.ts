@@ -14,7 +14,7 @@ import {
 
 const REFRESH_DEBOUNCE_MS = 250;
 const EMPTY_LIST =
-  "No traces yet. Use a Web AI API on this page to record telemetry.";
+  "No traces yet. Use a Built-in AI API on this page to record telemetry.";
 
 const inspectedTabId = chrome.devtools.inspectedWindow.tabId;
 

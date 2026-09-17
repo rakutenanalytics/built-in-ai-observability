@@ -1,8 +1,8 @@
-# Web AI OpenTelemetry
+# Built-in AI OpenTelemetry
 
-OpenTelemetry instrumentation for browser Web AI APIs. One shared instrumentation library, two ways to run it: a production browser SDK, or a Chrome DevTools extension that instruments pages without code changes.
+OpenTelemetry instrumentation for browser Built-in AI APIs. One shared instrumentation library, two ways to run it: a production browser SDK, or a Chrome DevTools extension that instruments pages without code changes.
 
-Browser-local AI runs inside the page. Network-level observability never sees the prompts, the model calls, or context window usage. This project instruments the Web AI APIs directly and exports standard OpenTelemetry spans.
+Browser-local AI runs inside the page. Network-level observability never sees the prompts, the model calls, or context window usage. This project instruments the Built-in AI APIs directly and exports standard OpenTelemetry spans.
 
 ## Two usage modes
 
@@ -36,9 +36,9 @@ flowchart TB
 
 ```mermaid
 flowchart TB
-  subgraph apis ["Web AI APIs"]
+  subgraph apis ["Built-in AI APIs"]
     LM["LanguageModel (Prompt API)"]
-    FUTURE["Other Web AI APIs (planned)"]
+    FUTURE["Other Built-in AI APIs (planned)"]
   end
 
   subgraph libs ["Shared libraries"]
@@ -163,7 +163,7 @@ Inference spans follow [OpenTelemetry GenAI conventions](https://github.com/open
 
 Context window measurements are **not** mapped to `gen_ai.usage.*` token counts. The Prompt API reports context occupancy, not per-request token billing.
 
-Every span carries `web_ai.api.name` so traces stay attributable once more Web AI APIs are instrumented. Spans emitted per session:
+Every span carries `web_ai.api.name` so traces stay attributable once more Built-in AI APIs are instrumented. Spans emitted per session:
 
 | Span | When |
 | --- | --- |

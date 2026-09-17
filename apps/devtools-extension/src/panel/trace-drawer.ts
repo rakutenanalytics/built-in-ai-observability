@@ -84,8 +84,8 @@ export function createTraceDrawer(
   panel.setAttribute("aria-label", "Trace detail");
   panel.tabIndex = -1;
 
-  const previous = iconButton("←", "Previous trace");
-  const next = iconButton("→", "Next trace");
+  const previous = iconButton("←", "Previous trace (Left arrow)");
+  const next = iconButton("→", "Next trace (Right arrow)");
   const close = iconButton("✕", "Close trace");
   const title = el("h2", "drawer-title");
   const summary = el("p", "drawer-summary");
@@ -103,6 +103,16 @@ export function createTraceDrawer(
     if (event.key === "Escape") {
       event.preventDefault();
       closeDrawer();
+      return;
+    }
+    if (event.key === "ArrowLeft" && index > 0) {
+      event.preventDefault();
+      show(index - 1);
+      return;
+    }
+    if (event.key === "ArrowRight" && index < traces.length - 1) {
+      event.preventDefault();
+      show(index + 1);
     }
   }
 

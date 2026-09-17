@@ -2,7 +2,7 @@
   "name": "@web-ai-otel/playground",
   "version": "0.1.0",
   "private": true,
-  "description": "Playground for Web AI OpenTelemetry instrumentation",
+  "description": "Playground for Built-in AI OpenTelemetry instrumentation",
   "type": "module",
   "scripts": {
     "build": "vite build",
