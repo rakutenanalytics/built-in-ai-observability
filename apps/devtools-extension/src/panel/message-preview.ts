@@ -11,10 +11,18 @@ export interface PrettyToolCall {
   name: string;
 }
 
+export interface PrettyMedia {
+  label?: string;
+  placeholder?: boolean;
+  src?: string;
+  type: "audio" | "image";
+}
+
 /** One card in the Pretty view — a user turn, a tool result, or tool calls. */
 export interface PrettyMessage {
   /** Structured tool payload shown as key/value rows when there is no text. */
   fields?: Record<string, unknown>;
+  media?: PrettyMedia[];
   role: string;
   text?: string;
   title: string;
@@ -107,6 +115,78 @@ function mapOpenAiToolCalls(
   }));
 }
 
+function openAiImageMedia(entry: Record<string, unknown>): PrettyMedia {
+  const url = (entry.image_url as { url?: string } | undefined)?.url;
+  return url
+    ? { src: url, type: "image" }
+    : { placeholder: true, type: "image" };
+}
+
+function openAiAudioMedia(entry: Record<string, unknown>): PrettyMedia {
+  const inputAudio = entry.input_audio as
+    | { data?: string; format?: string }
+    | undefined;
+  if (!inputAudio?.data) {
+    return { placeholder: true, type: "audio" };
+  }
+  const format = inputAudio.format === "wav" ? "wav" : "mp3";
+  const mime = format === "wav" ? "audio/wav" : "audio/mpeg";
+  return {
+    src: `data:${mime};base64,${inputAudio.data}`,
+    type: "audio",
+  };
+}
+
+function openAiContentPart(
+  part: unknown,
+  textParts: string[],
+  media: PrettyMedia[]
+): void {
+  if (!part || typeof part !== "object") {
+    return;
+  }
+  const entry = part as Record<string, unknown>;
+  const type = String(entry.type ?? "");
+
+  if (type === "text") {
+    const { text } = entry;
+    if (typeof text === "string") {
+      textParts.push(text);
+    }
+    return;
+  }
+  if (type === "image_url") {
+    media.push(openAiImageMedia(entry));
+    return;
+  }
+  if (type === "input_audio") {
+    media.push(openAiAudioMedia(entry));
+  }
+}
+
+function openAiContentParts(content: unknown): {
+  media?: PrettyMedia[];
+  text?: string;
+} {
+  if (typeof content === "string") {
+    return { text: content };
+  }
+  if (!Array.isArray(content)) {
+    return { text: textFromContent(content) };
+  }
+
+  const textParts: string[] = [];
+  const media: PrettyMedia[] = [];
+  for (const part of content) {
+    openAiContentPart(part, textParts, media);
+  }
+
+  return {
+    media: media.length > 0 ? media : undefined,
+    text: textParts.length > 0 ? textParts.join("\n") : undefined,
+  };
+}
+
 function openAiMessageCard(
   message: Record<string, unknown>
 ): PrettyMessage | undefined {
@@ -114,10 +194,10 @@ function openAiMessageCard(
   const toolCalls = mapOpenAiToolCalls(
     message.tool_calls as OpenAiToolCall[] | undefined
   );
-  const text = textFromContent(message.content);
+  const { media, text } = openAiContentParts(message.content);
 
   if (toolCalls?.length) {
-    return { role, text, title: roleTitle(role), toolCalls };
+    return { media, role, text, title: roleTitle(role), toolCalls };
   }
 
   if (role === "tool") {
@@ -134,10 +214,10 @@ function openAiMessageCard(
     };
   }
 
-  if (!text) {
+  if (!(text || media?.length)) {
     return;
   }
-  return { role, text, title: roleTitle(role) };
+  return { media, role, text, title: roleTitle(role) };
 }
 
 function openAiMessages(parsed: unknown): PrettyMessage[] | undefined {
@@ -164,6 +244,7 @@ function toolResponseCard(part: GenAiPart): PrettyMessage {
 }
 
 function genAiPartCards(part: GenAiPart): {
+  media?: PrettyMedia[];
   text?: string;
   toolCall?: PrettyToolCall;
   toolResponse?: PrettyMessage;
@@ -184,7 +265,11 @@ function genAiPartCards(part: GenAiPart): {
     return { toolResponse: toolResponseCard(part) };
   }
   if (part.type === "redacted") {
-    return { text: `[${String(part.modality ?? "redacted")}]` };
+    const modality = String(part.modality ?? "redacted");
+    if (modality === "audio" || modality === "image") {
+      return { media: [{ placeholder: true, type: modality }] };
+    }
+    return { text: `[${modality}]` };
   }
   return {};
 }
@@ -194,6 +279,7 @@ function genAiTurnCards(message: {
   parts?: GenAiPart[];
 }): PrettyMessage[] {
   const textParts: string[] = [];
+  const mediaParts: PrettyMedia[] = [];
   const toolCalls: PrettyToolCall[] = [];
   const cards: PrettyMessage[] = [];
 
@@ -201,6 +287,9 @@ function genAiTurnCards(message: {
     const parsed = genAiPartCards(part);
     if (parsed.text) {
       textParts.push(parsed.text);
+    }
+    if (parsed.media) {
+      mediaParts.push(...parsed.media);
     }
     if (parsed.toolCall) {
       toolCalls.push(parsed.toolCall);
@@ -212,10 +301,11 @@ function genAiTurnCards(message: {
 
   const role = message.role ?? "user";
   const text = textParts.length > 0 ? textParts.join("\n") : undefined;
+  const media = mediaParts.length > 0 ? mediaParts : undefined;
   if (toolCalls.length > 0) {
-    cards.push({ role, text, title: roleTitle(role), toolCalls });
-  } else if (text) {
-    cards.push({ role, text, title: roleTitle(role) });
+    cards.push({ media, role, text, title: roleTitle(role), toolCalls });
+  } else if (text || media) {
+    cards.push({ media, role, text, title: roleTitle(role) });
   }
   return cards;
 }

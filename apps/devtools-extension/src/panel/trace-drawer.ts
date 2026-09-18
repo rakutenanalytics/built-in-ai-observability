@@ -163,15 +163,34 @@ export function createTraceDrawer(
 
     renderedSpanCount = trace.spanCount;
     body.replaceChildren(traceMeta(trace), el("p", "empty", "Loading spans…"));
+
+    // A later navigation may have replaced this trace mid-load.
+    const isCurrent = () => traces[index]?.traceId === trace.traceId;
+    const showError = (err: unknown): void => {
+      body.replaceChildren(
+        traceMeta(trace),
+        el("p", "empty error", err instanceof Error ? err.message : String(err))
+      );
+    };
+
     loadSpans(trace)
       .then((spans) => {
-        // A later navigation may have replaced this trace mid-load.
-        if (traces[index]?.traceId !== trace.traceId) {
+        if (!isCurrent()) {
           return;
         }
-        body.replaceChildren(traceMeta(trace), buildSpanBrowser(spans));
+        // Rendering a span whose attributes are malformed must surface the
+        // failure, not leave the drawer stuck on "Loading spans…".
+        try {
+          body.replaceChildren(traceMeta(trace), buildSpanBrowser(spans));
+        } catch (err) {
+          showError(err);
+        }
       })
-      .catch(console.error);
+      .catch((err: unknown) => {
+        if (isCurrent()) {
+          showError(err);
+        }
+      });
   }
 
   function show(nextIndex: number): void {

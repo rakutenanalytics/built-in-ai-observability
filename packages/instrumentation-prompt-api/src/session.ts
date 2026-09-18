@@ -9,9 +9,12 @@ import {
   GEN_AI,
   type InstrumentationConfig,
   mlflowChatPreview,
+  mlflowChatPreviewFromPrompt,
+  mlflowChatPreviewFromPromptAsync,
   OPERATION_GENERATE_CONTENT,
   OPERATION_INVOKE_AGENT,
   PROMPT_API_NAME,
+  promptNeedsAsyncMlflowPreview,
   readContextUsage,
   type SessionTelemetryMeta,
   sessionAttributes,
@@ -24,6 +27,7 @@ import {
 
 const MLFLOW_INPUTS = "mlflow.spanInputs";
 const MLFLOW_OUTPUTS = "mlflow.spanOutputs";
+const DEFAULT_MLFLOW_MEDIA_PREVIEW_LENGTH = 1_048_576;
 
 /**
  * A call the model asked for and the page has not answered yet. The tool runs
@@ -259,11 +263,37 @@ export interface TurnRequest {
   traffic: ToolTraffic;
 }
 
+function mlflowPreviewOptions(
+  config: InstrumentationConfig
+): { captureMultimodalPreview: true; maxPreviewBytes?: number } | undefined {
+  if (!config.captureMultimodalPreview) {
+    return;
+  }
+  return {
+    captureMultimodalPreview: true,
+    maxPreviewBytes: config.multimodalPreviewMaxBytes,
+  };
+}
+
+/**
+ * Media previews are bounded by multimodalPreviewMaxBytes, not by the text
+ * attribute cap — applying the latter would strip the base64 back out.
+ */
+function mlflowPreviewMaxLength(config: InstrumentationConfig): number {
+  if (!config.captureMultimodalPreview) {
+    return config.maxAttributeLength;
+  }
+  return (
+    config.maxMlflowMediaPreviewLength ?? DEFAULT_MLFLOW_MEDIA_PREVIEW_LENGTH
+  );
+}
+
 function captureInputAttributes(
   attributes: Attributes,
   { input, config }: TurnRequest
 ): void {
-  const inputMessages = encodeInputMessages(input as LanguageModelPrompt);
+  const prompt = input as LanguageModelPrompt;
+  const inputMessages = encodeInputMessages(prompt);
   attributes[GEN_AI.INPUT_MESSAGES] = truncateAttribute(
     JSON.stringify(inputMessages),
     config.maxAttributeLength
@@ -271,9 +301,47 @@ function captureInputAttributes(
   if (!config.includeMlflowPreview) {
     return;
   }
-  const preview = mlflowChatPreview(inputMessages, config.maxAttributeLength);
+  if (
+    config.captureMultimodalPreview &&
+    promptNeedsAsyncMlflowPreview(prompt)
+  ) {
+    return;
+  }
+  const previewOptions = mlflowPreviewOptions(config);
+  const preview = config.captureMultimodalPreview
+    ? mlflowChatPreviewFromPrompt(
+        prompt,
+        mlflowPreviewMaxLength(config),
+        previewOptions
+      )
+    : mlflowChatPreview(inputMessages, config.maxAttributeLength);
   if (preview) {
     attributes[MLFLOW_INPUTS] = preview;
+  }
+}
+
+/** WebM audio is transcoded to WAV asynchronously after the span opens. */
+export async function enrichMlflowInputPreview(
+  span: Span,
+  input: unknown,
+  config: InstrumentationConfig
+): Promise<void> {
+  if (
+    !(
+      config.includeMlflowPreview &&
+      config.captureMultimodalPreview &&
+      promptNeedsAsyncMlflowPreview(input as LanguageModelPrompt)
+    )
+  ) {
+    return;
+  }
+  const preview = await mlflowChatPreviewFromPromptAsync(
+    input as LanguageModelPrompt,
+    mlflowPreviewMaxLength(config),
+    mlflowPreviewOptions(config)
+  );
+  if (preview) {
+    span.setAttributes({ [MLFLOW_INPUTS]: preview });
   }
 }
 

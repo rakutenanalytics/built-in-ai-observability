@@ -32,6 +32,7 @@ import {
   attachOverflowListeners,
   createSessionAttributes,
   createSessionState,
+  enrichMlflowInputPreview,
   exchangeAttributes,
   exchangeResultAttributes,
   promptApiAttributes,
@@ -179,6 +180,9 @@ export function wrapSession(
       usageBefore: readContextUsage(session),
       windowTokens: readContextWindow(session),
     };
+    enrichMlflowInputPreview(span, input, config).catch(() => {
+      // Preview enrichment is best-effort; the exchange span still records text.
+    });
     return spanContext;
   };
 
@@ -284,7 +288,10 @@ export function wrapSession(
       let turn: AssistantTurn | undefined;
       let endedAt: number | undefined;
       try {
-        const output = await session.prompt(input, opts);
+        const [, output] = await Promise.all([
+          enrichMlflowInputPreview(span, input, config),
+          session.prompt(input, opts),
+        ]);
         const at = spanTimestamp();
         endedAt = at;
         // A turn asking for a tool resolves to content parts, not a string.
@@ -416,7 +423,10 @@ export function wrapSession(
         let turn: AssistantTurn | undefined;
         let endedAt: number | undefined;
         try {
-          await context.with(spanContext, () => pump(controller));
+          await Promise.all([
+            enrichMlflowInputPreview(span, input, config),
+            context.with(spanContext, () => pump(controller)),
+          ]);
           const at = spanTimestamp();
           endedAt = at;
           // Registered before the attributes are written so the turn's own

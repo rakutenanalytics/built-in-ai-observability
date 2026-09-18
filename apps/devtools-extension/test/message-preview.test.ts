@@ -45,6 +45,43 @@ describe("spanInputs", () => {
     });
     expect(payload?.fields).toEqual({ city: "Kyoto", date: "2026-09-11" });
   });
+
+  it("parses OpenAI image_url content into media cards", () => {
+    const payload = spanInputs({
+      "mlflow.spanInputs": JSON.stringify({
+        messages: [
+          {
+            content: [
+              { text: "What is this?", type: "text" },
+              {
+                image_url: { url: "data:image/jpeg;base64,abc123" },
+                type: "image_url",
+              },
+            ],
+            role: "user",
+          },
+        ],
+      }),
+    });
+    expect(payload?.messages[0]?.text).toBe("What is this?");
+    expect(payload?.messages[0]?.media).toEqual([
+      { src: "data:image/jpeg;base64,abc123", type: "image" },
+    ]);
+  });
+
+  it("shows placeholders for redacted gen_ai image parts", () => {
+    const payload = spanInputs({
+      [GEN_AI.INPUT_MESSAGES]: JSON.stringify([
+        {
+          parts: [{ modality: "image", type: "redacted" }],
+          role: "user",
+        },
+      ]),
+    });
+    expect(payload?.messages[0]?.media).toEqual([
+      { placeholder: true, type: "image" },
+    ]);
+  });
 });
 
 describe("spanOutputs", () => {
@@ -108,5 +145,26 @@ describe("spanOutputs", () => {
       text: "Sunny, 24C",
       title: "Result",
     });
+  });
+
+  it("parses OpenAI input_audio content into media cards", () => {
+    const payload = spanOutputs({
+      "mlflow.spanOutputs": JSON.stringify({
+        messages: [
+          {
+            content: [
+              {
+                input_audio: { data: "AQIDBA==", format: "mp3" },
+                type: "input_audio",
+              },
+            ],
+            role: "user",
+          },
+        ],
+      }),
+    });
+    expect(payload?.messages[0]?.media).toEqual([
+      { src: "data:audio/mpeg;base64,AQIDBA==", type: "audio" },
+    ]);
   });
 });

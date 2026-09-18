@@ -26,7 +26,9 @@ if (!globals[INSTALLED_KEY]) {
   // page's own global OpenTelemetry context, which we must not disturb.
   const instrumentation = new PromptApiInstrumentation({
     captureInput: true,
+    captureMultimodalPreview: true,
     captureOutput: true,
+    includeMlflowPreview: true,
     tracerProvider: provider,
   });
   instrumentation.enable();

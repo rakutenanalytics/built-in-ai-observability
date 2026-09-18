@@ -2,6 +2,7 @@ import { renderMarkdown } from "./markdown/render-dom.js";
 import type {
   IoPayload,
   IoView,
+  PrettyMedia,
   PrettyMessage,
   PrettyToolCall,
 } from "./message-preview.js";
@@ -55,6 +56,35 @@ function objectFields(value: unknown): Record<string, unknown> | undefined {
   }
 }
 
+function renderMedia(media: PrettyMedia): HTMLElement {
+  if (media.placeholder || !media.src) {
+    const placeholder = el(
+      "div",
+      `message-media message-media-placeholder message-${media.type}`
+    );
+    placeholder.setAttribute(
+      "aria-label",
+      media.type === "image" ? "Image (not captured)" : "Audio (not captured)"
+    );
+    placeholder.textContent = media.type === "image" ? "Image" : "Audio";
+    return placeholder;
+  }
+
+  if (media.type === "image") {
+    const image = document.createElement("img");
+    image.alt = media.label ?? "Image input";
+    image.className = "message-media message-image";
+    image.src = media.src;
+    return image;
+  }
+
+  const audio = document.createElement("audio");
+  audio.className = "message-media message-audio";
+  audio.controls = true;
+  audio.src = media.src;
+  return audio;
+}
+
 function renderMessageCard(message: PrettyMessage): HTMLElement {
   const card = el("article", `message-card role-${message.role}`);
   card.append(el("header", "message-role", message.title));
@@ -63,6 +93,12 @@ function renderMessageCard(message: PrettyMessage): HTMLElement {
     card.append(el("div", "message-subtitle", "Tool calls"));
     for (const call of message.toolCalls) {
       card.append(renderToolCall(call));
+    }
+  }
+
+  if (message.media?.length) {
+    for (const item of message.media) {
+      card.append(renderMedia(item));
     }
   }
 

@@ -140,9 +140,11 @@ The injected provider is deliberately **not** registered as the page's global Op
 pnpm dev:playground
 ```
 
+Tabs cover plain text, image and audio prompts, and tool calling.
+
 - Default: SDK mode, exporting OTLP to a collector on `localhost:4318`
 - Extension-only: `?sdk=false` (no SDK; use the extension)
-- MLflow: `?experiment=<id>` exports to a local MLflow instead, which ingests OTLP directly and renders the traces from the attributes we already emit. `?otlp=<url>` points anywhere else.
+- MLflow: `?experiment=<id>` exports to a local MLflow instead, which ingests OTLP directly and renders the traces from the attributes we already emit. It also turns on [multimodal previews](#multimodal-content), since MLflow is what renders them. `?otlp=<url>` points anywhere else.
 
 ```bash
 pnpm mlflow   # http://localhost:5000, then open ?experiment=0
@@ -178,6 +180,28 @@ Every span carries `web_ai.api.name` so traces stay attributable once more Built
 ### Model download state
 
 `web_ai.model.download_observed` is only set when a `downloadprogress` event reports *fractional* progress. Chrome fires `loaded: 0` immediately followed by `loaded: 1` even when the model is already on disk, so treating the first event as a download start reports one on every `create()`. `web_ai.model.download_duration` and the `web_ai.model.download_complete` event are likewise emitted only once real progress is seen; an instantaneous download is therefore reported as no download rather than a phantom one.
+
+### Multimodal content
+
+Image and audio parts are encoded twice, because the two readers want opposite things from them.
+
+`gen_ai.input.messages` records that a turn carried media and nothing more, so the standard attributes stay safe to ship anywhere:
+
+```json
+{ "type": "redacted", "modality": "audio" }
+```
+
+`mlflow.spanInputs` — written only when `includeMlflowPreview` and `captureMultimodalPreview` are both on — carries an OpenAI-shaped content part with an inline preview, which is what MLflow and the DevTools panel turn into a thumbnail or an audio player:
+
+```json
+{ "type": "input_audio", "input_audio": { "data": "UklGR…", "format": "wav" } }
+```
+
+Previews are re-encoded, never passed through. Images become JPEG thumbnails capped at 320 px. Audio is decoded and resampled to 16 kHz mono 16-bit PCM WAV, because MLflow renders a player only for `wav` or `mp3` while a browser can encode neither Opus nor MP3 — `MediaRecorder` produces WebM/Opus and Web Audio produces raw PCM. Exporting the WebM as-is makes MLflow fall back to dumping raw base64 instead.
+
+That WAV costs roughly 32 KB per second, which is what the budgets are sized around: `multimodalPreviewMaxBytes` defaults to 200 KB for audio (about five seconds) and 512 KB for images. `maxMlflowMediaPreviewLength` then caps the finished attribute at 1 MB, deliberately separate from `maxAttributeLength` — that limit is sized for text, and reusing it here strips the media straight back out. A preview that overflows anyway drops its bytes before the JSON is truncated, so the attribute always stays parseable.
+
+Decoding WebM is async and so cannot happen while a span's attributes are being assembled. That one preview is attached after the span opens, in parallel with `prompt()`, and is best-effort: a span that ends first keeps its redacted GenAI attributes.
 
 ## Traces and sessions
 
@@ -218,7 +242,8 @@ Parents are threaded explicitly through `SessionState` rather than taken from am
 - `captureInput` / `captureOutput` control prompt and response content in spans
 - SDK defaults: content capture off
 - DevTools extension defaults: content capture on (local debugging)
-- Image and audio parts are never exported as bytes; they are redacted
+- `gen_ai.*` attributes never carry image or audio bytes; multimodal parts are redacted to their modality
+- `captureMultimodalPreview` is the one exception, and it is off by default in the SDK (on in the extension, for local debugging). It writes re-encoded image and audio previews to `mlflow.spanInputs` only — see [Multimodal content](#multimodal-content)
 
 Telemetry never leaves the browser unless you configure an exporter or explicitly export from DevTools.
 

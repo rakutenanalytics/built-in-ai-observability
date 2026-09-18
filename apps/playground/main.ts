@@ -74,9 +74,10 @@ if (modeInfo) {
 if (USE_SDK) {
   const sdk = new WebAISDK({
     captureInput: true,
-    captureOutput: true,
     // MLflow builds its list previews and chat view from these; other backends
     // read the GenAI attributes and do not need them.
+    captureMultimodalPreview: Boolean(experimentId),
+    captureOutput: true,
     includeMlflowPreview: Boolean(experimentId),
     otlpHeaders,
     otlpUrl,

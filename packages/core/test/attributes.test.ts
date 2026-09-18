@@ -8,7 +8,10 @@ import {
   encodeInputMessages,
   encodeOutputMessages,
   encodeSystemInstructions,
+  fitMlflowPreview,
   mlflowChatPreview,
+  mlflowChatPreviewFromPrompt,
+  promptNeedsAsyncMlflowPreview,
 } from "../src/attributes/messages.js";
 
 describe("encodeInputMessages", () => {
@@ -198,6 +201,115 @@ describe("mlflowChatPreview", () => {
         4
       )
     ).toBe('{"me…[truncated]');
+  });
+});
+
+describe("mlflowChatPreviewFromPrompt", () => {
+  const preview = (
+    input: Parameters<typeof mlflowChatPreviewFromPrompt>[0],
+    options?: Parameters<typeof mlflowChatPreviewFromPrompt>[2]
+  ) => JSON.parse(mlflowChatPreviewFromPrompt(input, 0, options) ?? "null");
+
+  it("exports WAV audio as OpenAI input_audio parts", () => {
+    const audio = Uint8Array.from([
+      0x52, 0x49, 0x46, 0x46, 0x24, 0x00, 0x00, 0x00, 0x57, 0x41, 0x56, 0x45,
+      0x66, 0x6d, 0x74, 0x20, 0x10, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00,
+      0x44, 0xac, 0x00, 0x00, 0x88, 0x58, 0x01, 0x00, 0x02, 0x00, 0x10, 0x00,
+      0x64, 0x61, 0x74, 0x61, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00,
+    ]).buffer;
+    const parsed = preview(
+      [
+        {
+          content: [
+            { type: "text", value: "Transcribe this" },
+            { type: "audio", value: audio },
+          ],
+          role: "user",
+        },
+      ],
+      { captureMultimodalPreview: true }
+    );
+    expect(parsed.messages[0].content[0]).toEqual({
+      text: "Transcribe this",
+      type: "text",
+    });
+    expect(parsed.messages[0].content[1].type).toBe("input_audio");
+    expect(parsed.messages[0].content[1].input_audio.format).toBe("wav");
+  });
+
+  it("defers WebM audio to async preview enrichment", () => {
+    const webm = new Uint8Array([0x1a, 0x45, 0xdf, 0xa3, 0x01]).buffer;
+    expect(
+      promptNeedsAsyncMlflowPreview([
+        { content: [{ type: "audio", value: webm }], role: "user" },
+      ])
+    ).toBe(true);
+    expect(
+      preview(
+        [
+          {
+            content: [
+              { type: "text", value: "Transcribe this" },
+              { type: "audio", value: webm },
+            ],
+            role: "user",
+          },
+        ],
+        { captureMultimodalPreview: true }
+      )
+    ).toEqual({
+      messages: [
+        {
+          content: "Transcribe this\n[audio]",
+          role: "user",
+        },
+      ],
+    });
+  });
+
+  it("falls back to placeholders when previews are disabled", () => {
+    expect(
+      preview([
+        {
+          content: [{ type: "image", value: "secret" }],
+          role: "user",
+        },
+      ])
+    ).toEqual({
+      messages: [{ content: "[image]", role: "user" }],
+    });
+  });
+
+  it("strips media bytes before hard truncation", () => {
+    const json = fitMlflowPreview(
+      [
+        {
+          content: [
+            { text: "hello", type: "text" },
+            {
+              input_audio: { data: "A".repeat(40_000), format: "wav" },
+              type: "input_audio",
+            },
+          ],
+          role: "user",
+        },
+      ],
+      500
+    );
+    expect(json).toBeDefined();
+    const parsed = JSON.parse(json ?? "null");
+    expect(parsed.messages[0].content[1].input_audio.data).toBe("");
+    expect(JSON.parse(json ?? "null")).toEqual(parsed);
+  });
+
+  it("keeps gen_ai attributes redacted while exporting previews separately", () => {
+    const encoded = encodeInputMessages([
+      { content: [{ type: "audio", value: "secret-bytes" }], role: "user" },
+    ]);
+    expect(encoded[0]?.parts).toEqual([
+      { modality: "audio", type: "redacted" },
+    ]);
+    expect(JSON.stringify(encoded)).not.toContain("secret-bytes");
   });
 });
 

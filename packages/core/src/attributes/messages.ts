@@ -1,6 +1,15 @@
 import { TOOL_TYPE_FUNCTION } from "../semantic-conventions/attributes.js";
 import { truncateAttribute } from "./helpers.js";
 import {
+  audioFormatFromMime,
+  extractMediaPreview,
+  extractMediaPreviewAsync,
+  isWebmAudio,
+  type MediaPreview,
+  type MultimodalPreviewOptions,
+  mediaPreviewDataUri,
+} from "./multimodal.js";
+import {
   type AssistantTurn,
   readToolCall,
   readToolResponse,
@@ -193,8 +202,25 @@ interface OpenAiToolCall {
   type: string;
 }
 
+interface OpenAiTextPart {
+  text: string;
+  type: "text";
+}
+
+interface OpenAiImagePart {
+  image_url: { url: string };
+  type: "image_url";
+}
+
+interface OpenAiAudioPart {
+  input_audio: { data: string; format: "mp3" | "wav" };
+  type: "input_audio";
+}
+
+type OpenAiContentPart = OpenAiAudioPart | OpenAiImagePart | OpenAiTextPart;
+
 interface OpenAiMessage {
-  content: string | null;
+  content: OpenAiContentPart[] | string | null;
   role: string;
   tool_call_id?: string;
   tool_calls?: OpenAiToolCall[];
@@ -292,5 +318,275 @@ export function mlflowChatPreview(
   if (chat.length === 0) {
     return;
   }
-  return truncateAttribute(JSON.stringify({ messages: chat }), maxLength);
+  return fitMlflowPreview(chat, maxLength);
+}
+
+function openAiContentPartFromPreview(
+  partType: string,
+  preview: MediaPreview
+): OpenAiContentPart | undefined {
+  if (partType === "image") {
+    return {
+      image_url: { url: mediaPreviewDataUri(preview) },
+      type: "image_url",
+    };
+  }
+  if (partType === "audio") {
+    return {
+      input_audio: {
+        data: preview.dataBase64,
+        format: audioFormatFromMime(preview.mimeType),
+      },
+      type: "input_audio",
+    };
+  }
+}
+
+function openAiContentPartFromRaw(
+  part: MessagePart,
+  options?: MultimodalPreviewOptions & { captureMultimodalPreview?: boolean }
+): OpenAiContentPart | undefined {
+  const text = textPartFrom(part);
+  if (text) {
+    return { text: text.content, type: "text" };
+  }
+  if (part.type === "tool-call" || part.type === "tool-response") {
+    return;
+  }
+  if (options?.captureMultimodalPreview) {
+    const preview = extractMediaPreview(
+      part.value ?? part.content,
+      part.type,
+      options
+    );
+    if (preview) {
+      return openAiContentPartFromPreview(part.type, preview);
+    }
+  }
+  return { text: `[${part.type}]`, type: "text" };
+}
+
+async function openAiContentPartFromRawAsync(
+  part: MessagePart,
+  options?: MultimodalPreviewOptions & { captureMultimodalPreview?: boolean }
+): Promise<OpenAiContentPart | undefined> {
+  const text = textPartFrom(part);
+  if (text) {
+    return { text: text.content, type: "text" };
+  }
+  if (part.type === "tool-call" || part.type === "tool-response") {
+    return;
+  }
+  if (options?.captureMultimodalPreview) {
+    const preview = await extractMediaPreviewAsync(
+      part.value ?? part.content,
+      part.type,
+      options
+    );
+    if (preview) {
+      return openAiContentPartFromPreview(part.type, preview);
+    }
+  }
+  return { text: `[${part.type}]`, type: "text" };
+}
+
+function rawContentParts(
+  content: string | MessagePart[] | undefined
+): MessagePart[] {
+  if (typeof content === "string") {
+    return [{ content, type: "text" }];
+  }
+  if (Array.isArray(content)) {
+    return content;
+  }
+  return [];
+}
+
+function contentFromRawParts(
+  rawParts: MessagePart[],
+  options?: MultimodalPreviewOptions & { captureMultimodalPreview?: boolean }
+): OpenAiContentPart[] {
+  return rawParts.flatMap((part) => {
+    if (part.type === "tool-call" || part.type === "tool-response") {
+      return [];
+    }
+    const content = openAiContentPartFromRaw(part, options);
+    return content ? [content] : [];
+  });
+}
+
+async function contentFromRawPartsAsync(
+  rawParts: MessagePart[],
+  options?: MultimodalPreviewOptions & { captureMultimodalPreview?: boolean }
+): Promise<OpenAiContentPart[]> {
+  const parts = await Promise.all(
+    rawParts.map((part) => {
+      if (part.type === "tool-call" || part.type === "tool-response") {
+        return Promise.resolve(undefined);
+      }
+      return openAiContentPartFromRawAsync(part, options);
+    })
+  );
+  return parts.filter((part): part is OpenAiContentPart => part !== undefined);
+}
+
+function finalizeOpenAiContent(
+  parts: OpenAiContentPart[]
+): OpenAiContentPart[] | string | null {
+  if (parts.length === 0) {
+    return null;
+  }
+  const hasMedia = parts.some((part) => part.type !== "text");
+  if (hasMedia) {
+    return parts;
+  }
+  const textParts = parts as OpenAiTextPart[];
+  if (textParts.length === 1) {
+    return textParts[0]?.text ?? null;
+  }
+  return textParts.map((part) => part.text).join("\n");
+}
+
+function assembleOpenAiMessages(
+  encoded: EncodedMessage,
+  contentParts: OpenAiContentPart[]
+): OpenAiMessage[] {
+  const { toolCalls, toolMessages } = shapeParts(encoded.parts);
+  const content = finalizeOpenAiContent(contentParts);
+
+  if (content === null && toolCalls.length === 0) {
+    return toolMessages;
+  }
+
+  const entry: OpenAiMessage = { content, role: encoded.role };
+  if (toolCalls.length > 0) {
+    entry.tool_calls = toolCalls;
+  }
+  return [...toolMessages, entry];
+}
+
+function promptMessages(
+  input: string | PromptMessage | PromptMessage[]
+): PromptMessage[] {
+  if (typeof input === "string") {
+    return [{ content: input, role: "user" }];
+  }
+  if (Array.isArray(input)) {
+    return input;
+  }
+  return [input];
+}
+
+function stripMediaBinary(messages: OpenAiMessage[]): OpenAiMessage[] {
+  return messages.map((message) => {
+    if (!Array.isArray(message.content)) {
+      return message;
+    }
+    return {
+      ...message,
+      content: message.content.map((part) => {
+        if (part.type === "image_url") {
+          return {
+            image_url: { url: "[image]" },
+            type: "image_url" as const,
+          };
+        }
+        if (part.type === "input_audio") {
+          return {
+            input_audio: {
+              data: "",
+              format: part.input_audio.format,
+            },
+            type: "input_audio" as const,
+          };
+        }
+        return part;
+      }),
+    };
+  });
+}
+
+/** Keeps MLflow preview JSON valid even when it exceeds the attribute cap. */
+export function fitMlflowPreview(
+  messages: OpenAiMessage[],
+  maxLength: number
+): string | undefined {
+  if (messages.length === 0) {
+    return;
+  }
+  let json = JSON.stringify({ messages });
+  if (maxLength <= 0 || json.length <= maxLength) {
+    return json;
+  }
+  json = JSON.stringify({ messages: stripMediaBinary(messages) });
+  if (json.length <= maxLength) {
+    return json;
+  }
+  return truncateAttribute(json, maxLength);
+}
+
+function partHasWebmAudio(part: MessagePart): boolean {
+  if (part.type !== "audio") {
+    return false;
+  }
+  const value = part.value ?? part.content;
+  return value instanceof ArrayBuffer && isWebmAudio(new Uint8Array(value));
+}
+
+/** True when multimodal preview needs async audio transcoding before export. */
+export function promptNeedsAsyncMlflowPreview(
+  input: string | PromptMessage | PromptMessage[]
+): boolean {
+  for (const { content } of promptMessages(input)) {
+    if (!Array.isArray(content)) {
+      continue;
+    }
+    if (content.some(partHasWebmAudio)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Builds MLflow OpenAI chat previews from raw Prompt API input so image and
+ * audio parts can carry inline previews while GenAI attributes stay redacted.
+ */
+export function mlflowChatPreviewFromPrompt(
+  input: string | PromptMessage | PromptMessage[],
+  maxLength: number,
+  options?: MultimodalPreviewOptions & { captureMultimodalPreview?: boolean }
+): string | undefined {
+  const encoded = encodeInputMessages(input);
+  const rawMessages = promptMessages(input);
+
+  const chat = encoded.flatMap((message, index) =>
+    assembleOpenAiMessages(
+      message,
+      contentFromRawParts(rawContentParts(rawMessages[index]?.content), options)
+    )
+  );
+  return fitMlflowPreview(chat, maxLength);
+}
+
+export async function mlflowChatPreviewFromPromptAsync(
+  input: string | PromptMessage | PromptMessage[],
+  maxLength: number,
+  options?: MultimodalPreviewOptions & { captureMultimodalPreview?: boolean }
+): Promise<string | undefined> {
+  const encoded = encodeInputMessages(input);
+  const rawMessages = promptMessages(input);
+  const messageGroups = await Promise.all(
+    encoded.map(async (message, index) =>
+      assembleOpenAiMessages(
+        message,
+        await contentFromRawPartsAsync(
+          rawContentParts(rawMessages[index]?.content),
+          options
+        )
+      )
+    )
+  );
+
+  return fitMlflowPreview(messageGroups.flat(), maxLength);
 }
