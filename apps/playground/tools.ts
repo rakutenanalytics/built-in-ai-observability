@@ -88,6 +88,36 @@ export const TOOL_SYSTEM_PROMPT =
   "every tool you need in one turn, then answer in one short sentence using " +
   "only what the tools returned.";
 
+/** Used when Tool call is clicked with an empty prompt. */
+export const DEFAULT_TOOL_PROMPT =
+  "What is the weather and the population of Kyoto?";
+
+export interface ToolExamplePrompt {
+  label: string;
+  prompt: string;
+}
+
+/** Click-to-fill examples for the Text tab. Ask about Tokyo, Kyoto, or Osaka. */
+export const TOOL_EXAMPLE_PROMPTS: ToolExamplePrompt[] = [
+  {
+    label: "Weather + population (Kyoto)",
+    prompt: DEFAULT_TOOL_PROMPT,
+  },
+  {
+    label: "Weather in Tokyo",
+    prompt: "What's the weather in Tokyo?",
+  },
+  {
+    label: "Population of Osaka",
+    prompt: "How many people live in Osaka?",
+  },
+  {
+    label: "Compare two cities",
+    prompt:
+      "Compare the weather in Osaka and Tokyo, and tell me which city is more populous.",
+  },
+];
+
 /**
  * Chrome refuses a tool result containing a JSON null at any depth: the whole
  * turn fails with a misleading serialization error. Strip them instead.
