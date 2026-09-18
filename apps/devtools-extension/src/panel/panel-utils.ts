@@ -31,10 +31,6 @@ export function iconButton(
   return button;
 }
 
-export function formatTime(ms: number): string {
-  return new Date(ms).toLocaleTimeString();
-}
-
 export function formatDuration(ms: number): string {
   if (ms < MS_PER_SECOND) {
     return `${Math.round(ms)}ms`;

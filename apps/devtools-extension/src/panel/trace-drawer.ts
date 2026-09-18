@@ -3,7 +3,6 @@ import { contextUtilizationLabel } from "./context-meta.js";
 import {
   el,
   formatDuration,
-  formatTime,
   iconButton,
   isErrorStatus,
   metaList,
@@ -11,6 +10,7 @@ import {
   shortId,
 } from "./panel-utils.js";
 import { buildSpanBrowser } from "./span-browser.js";
+import { formatDateTime } from "./time-format.js";
 
 export interface TraceDrawer {
   close: () => void;
@@ -46,7 +46,7 @@ function traceMeta(trace: TraceSummary): HTMLElement {
   return metaList([
     ["Trace", shortId(trace.traceId)],
     ["Session", trace.conversationId && shortId(trace.conversationId)],
-    ["Started", formatTime(trace.startTimeMs)],
+    ["Started", formatDateTime(trace.startTimeMs)],
     ["Origin", trace.origin],
     [
       "Tool calls",

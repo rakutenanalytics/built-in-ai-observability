@@ -3,12 +3,16 @@ import { contextUtilizationLabel } from "./context-meta.js";
 import {
   el,
   formatDuration,
-  formatTime,
   isErrorStatus,
   plural,
   shortId,
   toolSuffix,
 } from "./panel-utils.js";
+import {
+  formatTraceListTime,
+  getTimeBucket,
+  timeBucketLabel,
+} from "./time-format.js";
 
 const COLLAPSED_CHEVRON = "▸";
 const EXPANDED_CHEVRON = "▾";
@@ -17,6 +21,27 @@ export interface TraceListRender {
   /** Traces in display order, so the drawer can step through them. */
   order: TraceSummary[];
   rows: HTMLElement[];
+}
+
+interface TimestampedRow {
+  node: HTMLElement;
+  timeMs: number;
+}
+
+function withTimeBuckets(entries: TimestampedRow[]): HTMLElement[] {
+  const rows: HTMLElement[] = [];
+  let currentBucket: ReturnType<typeof getTimeBucket> | undefined;
+
+  for (const entry of entries) {
+    const bucket = getTimeBucket(entry.timeMs);
+    if (bucket !== currentBucket) {
+      rows.push(el("div", "time-bucket-header", timeBucketLabel(bucket)));
+      currentBucket = bucket;
+    }
+    rows.push(entry.node);
+  }
+
+  return rows;
 }
 
 function traceRow(
@@ -41,7 +66,7 @@ function traceRow(
     el(
       "span",
       "trace-row-right meta",
-      `${formatTime(trace.startTimeMs)} · ${formatDuration(trace.durationMs)}`
+      `${formatTraceListTime(trace.startTimeMs)} · ${formatDuration(trace.durationMs)}`
     )
   );
   button.append(top);
@@ -65,9 +90,13 @@ export function renderFlatList(
   traces: TraceSummary[],
   onOpen: (trace: TraceSummary) => void
 ): TraceListRender {
+  const entries = traces.map((trace) => ({
+    node: traceRow(trace, onOpen),
+    timeMs: trace.startTimeMs,
+  }));
   return {
     order: [...traces],
-    rows: traces.map((trace) => traceRow(trace, onOpen)),
+    rows: withTimeBuckets(entries),
   };
 }
 
@@ -75,19 +104,19 @@ function sessionMeta(
   session: SessionSummary | undefined,
   traces: TraceSummary[]
 ): string {
-  if (!session) {
-    return plural(traces.length, "trace");
-  }
-  const parts = [
-    plural(session.turnCount, "turn"),
-    formatDuration(session.durationMs),
-  ];
-  const context = contextUtilizationLabel(session);
-  if (context) {
-    parts.push(`${context} context`);
-  }
-  if (session.errorCount > 0) {
-    parts.push(plural(session.errorCount, "error"));
+  const parts = [formatTraceListTime(traces[0].startTimeMs)];
+  if (session) {
+    parts.push(plural(session.turnCount, "turn"));
+    parts.push(formatDuration(session.durationMs));
+    const context = contextUtilizationLabel(session);
+    if (context) {
+      parts.push(`${context} context`);
+    }
+    if (session.errorCount > 0) {
+      parts.push(plural(session.errorCount, "error"));
+    }
+  } else {
+    parts.push(plural(traces.length, "trace"));
   }
   return parts.join(" · ");
 }
@@ -157,29 +186,33 @@ export function renderGroupedList(
     grouped.set(trace.conversationId, list);
   }
 
-  const rows: HTMLElement[] = [];
+  const entries: TimestampedRow[] = [];
   const order: TraceSummary[] = [];
   // Traces arrive newest first, so the first group is the session being worked
   // on — the only one worth opening expanded.
   let isNewest = true;
   for (const [conversationId, groupTraces] of grouped) {
-    rows.push(
-      sessionGroup(
+    entries.push({
+      node: sessionGroup(
         conversationId,
         sessionById.get(conversationId),
         groupTraces,
         onOpen,
         isNewest
-      )
-    );
+      ),
+      timeMs: groupTraces[0].startTimeMs,
+    });
     order.push(...groupTraces);
     isNewest = false;
   }
 
   for (const trace of ungrouped) {
-    rows.push(traceRow(trace, onOpen));
+    entries.push({
+      node: traceRow(trace, onOpen),
+      timeMs: trace.startTimeMs,
+    });
     order.push(trace);
   }
 
-  return { order, rows };
+  return { order, rows: withTimeBuckets(entries) };
 }

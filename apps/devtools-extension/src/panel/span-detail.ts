@@ -5,7 +5,6 @@ import {
   buildTabs,
   el,
   formatDuration,
-  formatTime,
   isErrorStatus,
   type MetaEntry,
   metaList,
@@ -13,6 +12,7 @@ import {
 import { renderAttributesTab } from "./render-attributes.js";
 import { renderSpanIo } from "./render-io.js";
 import { type SpanGroups, spanContextUtilization } from "./span-groups.js";
+import { formatDateTime } from "./time-format.js";
 
 function renderIoTab(span: StoredSpan): HTMLElement {
   const inputs = spanInputs(span.attributes);
@@ -55,7 +55,7 @@ export function renderSpanDetail(
   );
   const metaEntries: MetaEntry[] = [
     ["Duration", formatDuration(span.durationMs)],
-    ["Started", formatTime(span.startTimeMs)],
+    ["Started", formatDateTime(span.startTimeMs)],
     ["Context", context],
   ];
   if (isErrorStatus(span.status.code)) {
