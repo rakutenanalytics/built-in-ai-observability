@@ -1,7 +1,7 @@
 {
   "name": "@web-ai-otel/core",
   "version": "0.1.0",
-  "description": "Shared semantic conventions and helpers for Built-in AI OpenTelemetry instrumentation",
+  "description": "Shared semantic conventions and helpers for Built-in AI Observability",
   "license": "Apache-2.0",
   "type": "module",
   "exports": {

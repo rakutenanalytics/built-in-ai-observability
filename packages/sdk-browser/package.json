@@ -1,7 +1,7 @@
 {
   "name": "@web-ai-otel/sdk-browser",
   "version": "0.1.0",
-  "description": "Browser SDK for Built-in AI OpenTelemetry instrumentation",
+  "description": "Browser SDK for Built-in AI Observability",
   "license": "Apache-2.0",
   "type": "module",
   "exports": {

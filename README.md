@@ -1,6 +1,6 @@
-# Built-in AI OpenTelemetry
+# Built-in AI Observability
 
-OpenTelemetry instrumentation for browser Built-in AI APIs. One shared instrumentation library, two ways to run it: a production browser SDK, or a Chrome DevTools extension that instruments pages without code changes.
+Observability for browser Built-in AI APIs, exported as OpenTelemetry spans. One shared instrumentation library, two ways to run it: a production browser SDK, or a Chrome DevTools extension that instruments pages without code changes.
 
 Browser-local AI runs inside the page. Network-level observability never sees the prompts, the model calls, or context window usage. This project instruments the Built-in AI APIs directly and exports standard OpenTelemetry spans.
 

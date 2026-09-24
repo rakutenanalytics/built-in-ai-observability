@@ -1,4 +1,4 @@
-# Implementation proposal: Built-in AI OpenTelemetry monorepo
+# Implementation proposal: Built-in AI Observability monorepo
 
 Discovery based on `web-ai-demos/prompt-api-observability/` (PoC).
 

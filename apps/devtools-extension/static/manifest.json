@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Built-in AI Traces",
   "version": "0.1.0",
-  "description": "Zero-code OpenTelemetry tracing for Chrome Built-in AI APIs",
+  "description": "Zero-code observability for Chrome Built-in AI APIs",
   "minimum_chrome_version": "111",
   "background": {
     "service_worker": "background.js",

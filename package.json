@@ -1,7 +1,7 @@
 {
   "name": "built-in-ai-observability",
   "private": true,
-  "description": "OpenTelemetry instrumentation for Built-in AI APIs",
+  "description": "Observability for browser Built-in AI APIs, exported as OpenTelemetry spans",
   "license": "Apache-2.0",
   "scripts": {
     "build": "turbo run build",
