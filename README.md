@@ -288,4 +288,4 @@ See `docs/implementation-proposal.md` for design decisions.
 
 ## License
 
-Apache-2.0
+Apache-2.0 — see [LICENSE](./LICENSE) and [NOTICE](./NOTICE).
