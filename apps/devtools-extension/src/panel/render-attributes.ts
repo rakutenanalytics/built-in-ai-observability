@@ -1,4 +1,4 @@
-import { GEN_AI } from "@web-ai-otel/core";
+import { GEN_AI } from "@built-in-ai-obs/core";
 import type { StoredSpan } from "../storage/indexed-db.js";
 import { el } from "./panel-utils.js";
 import { renderFields, renderViewSection } from "./render-io.js";

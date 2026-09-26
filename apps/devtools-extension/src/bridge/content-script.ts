@@ -1,9 +1,9 @@
 import {
   isSpanMessage,
   validateSerializedSpan,
-} from "@web-ai-otel/extension-transport/protocol";
+} from "@built-in-ai-obs/extension-transport/protocol";
 
-const BRIDGE_TYPE = "web-ai-otel:bridge-span";
+const BRIDGE_TYPE = "built-in-ai-obs:bridge-span";
 
 window.addEventListener("message", (event) => {
   if (event.source !== window) {

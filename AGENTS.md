@@ -10,11 +10,11 @@ Instructions for coding agents working on **built-in-ai-observability** — an o
 - **Lint/format:** Biome via Ultracite rules (`biome.jsonc`)
 - **Tests:** Vitest
 - **Workspace layout:**
-  - `packages/*` — libraries (`@web-ai-otel/core`, instrumentation, SDK, extension transport)
+  - `packages/*` — libraries (`@built-in-ai-obs/core`, instrumentation, SDK, extension transport)
   - `apps/*` — playground and Chrome DevTools extension
   - `examples/*` — minimal consumer apps
 
-Human-facing docs live in `README.md`. Design decisions are in `docs/implementation-proposal.md`.
+Human-facing docs live in `README.md`. Span and attribute details are in `docs/telemetry-reference.md`.
 
 ## Setup commands
 
@@ -52,7 +52,7 @@ Shared dependency versions are centralized in **`pnpm-workspace.yaml`** under th
 2. **Do** keep each dependency declared in the package that uses it (Turborepo needs explicit per-package deps).
 3. **Do** add new shared deps to the catalog in `pnpm-workspace.yaml` and reference them as `"catalog:"`.
 4. Root `package.json` is for repo-wide tooling only (`turbo`, `biome`, `typescript`, etc.) — not app/library runtime deps.
-5. Internal packages use `"workspace:*"` (e.g. `"@web-ai-otel/core": "workspace:*"`).
+5. Internal packages use `"workspace:*"` (e.g. `"@built-in-ai-obs/core": "workspace:*"`).
 
 Turborepo orchestrates tasks and caching; it does **not** manage dependency versions. Version centralization is a pnpm catalog concern.
 
@@ -115,7 +115,7 @@ Review changes to `pnpm-workspace.yaml`, `pnpm-lock.yaml`, and any resolved cata
 
 ```bash
 # Example: add a dep to one package
-pnpm add some-package --filter @web-ai-otel/core
+pnpm add some-package --filter @built-in-ai-obs/core
 # Then ensure the version in package.json is "catalog:" and the catalog entry exists
 ```
 
@@ -154,18 +154,18 @@ Prefer root scripts when available:
 
 | Script | Package |
 | --- | --- |
-| `pnpm dev:playground` | `@web-ai-otel/playground` |
-| `pnpm build:playground` | `@web-ai-otel/playground` |
-| `pnpm dev:vanilla` | `@web-ai-otel/example-vanilla` |
-| `pnpm build:vanilla` | `@web-ai-otel/example-vanilla` |
-| `pnpm dev:extension` | `@web-ai-otel/devtools-extension` |
-| `pnpm build:extension` | `@web-ai-otel/devtools-extension` |
+| `pnpm dev:playground` | `@built-in-ai-obs/playground` |
+| `pnpm build:playground` | `@built-in-ai-obs/playground` |
+| `pnpm dev:vanilla` | `@built-in-ai-obs/example-vanilla` |
+| `pnpm build:vanilla` | `@built-in-ai-obs/example-vanilla` |
+| `pnpm dev:extension` | `@built-in-ai-obs/devtools-extension` |
+| `pnpm build:extension` | `@built-in-ai-obs/devtools-extension` |
 
 For other packages, use Turborepo filters:
 
 ```bash
-turbo run build --filter=@web-ai-otel/core
-turbo run test --filter=@web-ai-otel/instrumentation-prompt-api
+turbo run build --filter=@built-in-ai-obs/core
+turbo run test --filter=@built-in-ai-obs/instrumentation-prompt-api
 turbo run build --affected   # only changed packages + dependents
 ```
 
@@ -175,7 +175,7 @@ Or `pnpm --filter <package-name> <script>` when a root alias does not exist.
 
 - Tests live next to source as `*.test.ts` under each package's `test/` directory.
 - `pnpm test` runs vitest via Turbo; packages without tests are skipped.
-- `@web-ai-otel/sdk-browser` uses `vitest run --passWithNoTests`.
+- `@built-in-ai-obs/sdk-browser` uses `vitest run --passWithNoTests`.
 - After code changes, run tests for the affected package at minimum; prefer the full `pnpm test` before finishing.
 
 Run a single test file or pattern from a package directory:

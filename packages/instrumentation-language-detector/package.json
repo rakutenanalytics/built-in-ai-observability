@@ -1,5 +1,5 @@
 {
-  "name": "@web-ai-otel/instrumentation-language-detector",
+  "name": "@built-in-ai-obs/instrumentation-language-detector",
   "version": "0.0.0",
   "private": true,
   "description": "Planned instrumentation for the Language Detector API"

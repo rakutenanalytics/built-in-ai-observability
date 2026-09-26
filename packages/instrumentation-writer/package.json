@@ -1,5 +1,5 @@
 {
-  "name": "@web-ai-otel/instrumentation-writer",
+  "name": "@built-in-ai-obs/instrumentation-writer",
   "version": "0.0.0",
   "private": true,
   "description": "Planned instrumentation for the Writer API"

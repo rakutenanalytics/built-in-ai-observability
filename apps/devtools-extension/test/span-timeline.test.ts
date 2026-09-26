@@ -1,3 +1,4 @@
+import { PROTOCOL_VERSION } from "@built-in-ai-obs/extension-transport/protocol";
 import { describe, expect, it } from "vitest";
 import { groupSpans } from "../src/panel/span-groups.js";
 import { axisTicks, timelineLayout } from "../src/panel/span-timeline.js";
@@ -25,7 +26,7 @@ function span(overrides: {
     kind: 0,
     name: overrides.name ?? overrides.spanId,
     parentSpanId: overrides.parentSpanId,
-    protocolVersion: 1,
+    protocolVersion: PROTOCOL_VERSION,
     source: {
       frameId: 0,
       origin: "https://a.test",

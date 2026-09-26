@@ -1,4 +1,4 @@
-import { GEN_AI } from "@web-ai-otel/core";
+import { GEN_AI } from "@built-in-ai-obs/core";
 
 const MLFLOW_INPUTS = "mlflow.spanInputs";
 const MLFLOW_OUTPUTS = "mlflow.spanOutputs";

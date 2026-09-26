@@ -1,7 +1,7 @@
 import {
   type SpanSource,
   validateSerializedSpan,
-} from "@web-ai-otel/extension-transport/protocol";
+} from "@built-in-ai-obs/extension-transport/protocol";
 import {
   BRIDGE_SPAN,
   type PanelRequest,

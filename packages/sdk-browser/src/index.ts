@@ -1,13 +1,13 @@
-import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
-import { resourceFromAttributes } from "@opentelemetry/resources";
-import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
-import { WebTracerProvider } from "@opentelemetry/sdk-trace-web";
 import {
   browserResourceAttributes,
   DEFAULT_CAPTURE_CONFIG,
   type InstrumentationConfig,
-} from "@web-ai-otel/core";
-import { PromptApiInstrumentation } from "@web-ai-otel/instrumentation-prompt-api";
+} from "@built-in-ai-obs/core";
+import { PromptApiInstrumentation } from "@built-in-ai-obs/instrumentation-prompt-api";
+import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
+import { resourceFromAttributes } from "@opentelemetry/resources";
+import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
+import { WebTracerProvider } from "@opentelemetry/sdk-trace-web";
 
 /**
  * Re-exported because tool use changed what a turn resolves to: `prompt()`
@@ -19,11 +19,12 @@ export {
   readAssistantTurn,
   type ToolCallInfo,
   type ToolResponseInfo,
-} from "@web-ai-otel/core";
+} from "@built-in-ai-obs/core";
 
 const DEFAULT_OTLP_URL = "http://localhost:4318/v1/traces";
 
-export interface WebAISDKOptions extends Partial<InstrumentationConfig> {
+export interface BuiltInAIObservabilityOptions
+  extends Partial<InstrumentationConfig> {
   otlpHeaders?: Record<string, string>;
   otlpUrl?: string;
   /** Enable Prompt API instrumentation. Defaults to true. */
@@ -36,13 +37,13 @@ export interface WebAISDKOptions extends Partial<InstrumentationConfig> {
   serviceName?: string;
 }
 
-export class WebAISDK {
+export class BuiltInAIObservability {
   private provider: WebTracerProvider | null = null;
   private instrumentation: PromptApiInstrumentation | null = null;
   private teardown: Array<() => void> = [];
-  private readonly options: WebAISDKOptions;
+  private readonly options: BuiltInAIObservabilityOptions;
 
-  constructor(options: WebAISDKOptions = {}) {
+  constructor(options: BuiltInAIObservabilityOptions = {}) {
     this.options = { ...DEFAULT_CAPTURE_CONFIG, ...options };
   }
 

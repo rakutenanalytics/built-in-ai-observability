@@ -1,11 +1,4 @@
 import {
-  type Attributes,
-  type Context,
-  SpanKind,
-  SpanStatusCode,
-  type Tracer,
-} from "@opentelemetry/api";
-import {
   ERROR_TYPE,
   GEN_AI,
   type InstrumentationConfig,
@@ -15,7 +8,14 @@ import {
   type ToolResponseInfo,
   truncateAttribute,
   WEB_AI,
-} from "@web-ai-otel/core";
+} from "@built-in-ai-obs/core";
+import {
+  type Attributes,
+  type Context,
+  SpanKind,
+  SpanStatusCode,
+  type Tracer,
+} from "@opentelemetry/api";
 import {
   type PendingToolCall,
   promptApiAttributes,

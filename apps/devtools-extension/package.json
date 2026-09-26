@@ -1,5 +1,5 @@
 {
-  "name": "@web-ai-otel/devtools-extension",
+  "name": "@built-in-ai-obs/devtools-extension",
   "version": "0.1.0",
   "private": true,
   "description": "Chrome DevTools extension for zero-code Built-in AI tracing",
@@ -11,12 +11,12 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
+    "@built-in-ai-obs/core": "workspace:*",
+    "@built-in-ai-obs/extension-transport": "workspace:*",
+    "@built-in-ai-obs/instrumentation-prompt-api": "workspace:*",
     "@opentelemetry/resources": "catalog:",
     "@opentelemetry/sdk-trace-base": "catalog:",
-    "@opentelemetry/sdk-trace-web": "catalog:",
-    "@web-ai-otel/core": "workspace:*",
-    "@web-ai-otel/extension-transport": "workspace:*",
-    "@web-ai-otel/instrumentation-prompt-api": "workspace:*"
+    "@opentelemetry/sdk-trace-web": "catalog:"
   },
   "devDependencies": {
     "@types/chrome": "catalog:",

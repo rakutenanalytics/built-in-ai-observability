@@ -1,9 +1,9 @@
 import type {
   SerializedSpan,
   SpanSource,
-} from "@web-ai-otel/extension-transport/protocol";
+} from "@built-in-ai-obs/extension-transport/protocol";
 
-const DB_NAME = "web-ai-otel";
+const DB_NAME = "built-in-ai-obs";
 const DB_VERSION = 4;
 const SPANS_STORE = "spans";
 const TRACES_STORE = "traces";

@@ -1,5 +1,5 @@
 {
-  "name": "@web-ai-otel/core",
+  "name": "@built-in-ai-obs/core",
   "version": "0.1.0",
   "description": "Shared semantic conventions and helpers for Built-in AI Observability",
   "license": "Apache-2.0",

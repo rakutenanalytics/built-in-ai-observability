@@ -2,7 +2,8 @@ import "fake-indexeddb/auto";
 import type {
   SerializedSpan,
   SpanSource,
-} from "@web-ai-otel/extension-transport/protocol";
+} from "@built-in-ai-obs/extension-transport/protocol";
+import { PROTOCOL_VERSION } from "@built-in-ai-obs/extension-transport/protocol";
 import { IDBFactory } from "fake-indexeddb";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -59,7 +60,7 @@ function span(overrides: {
     kind: 0,
     name: overrides.name,
     parentSpanId: overrides.parentSpanId,
-    protocolVersion: 1,
+    protocolVersion: PROTOCOL_VERSION,
     spanId: overrides.spanId,
     startTime: hr(startMs),
     status: { code: overrides.statusCode ?? OK },

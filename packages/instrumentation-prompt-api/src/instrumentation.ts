@@ -1,13 +1,4 @@
 import {
-  type Context,
-  context,
-  type Span,
-  SpanKind,
-  SpanStatusCode,
-  type Tracer,
-  trace,
-} from "@opentelemetry/api";
-import {
   type AssistantTurn,
   DEFAULT_CAPTURE_CONFIG,
   DEFAULT_PROVIDER_NAME,
@@ -27,7 +18,16 @@ import {
   toolCallFromChunk,
   toolTrafficFrom,
   WEB_AI,
-} from "@web-ai-otel/core";
+} from "@built-in-ai-obs/core";
+import {
+  type Context,
+  context,
+  type Span,
+  SpanKind,
+  SpanStatusCode,
+  type Tracer,
+  trace,
+} from "@opentelemetry/api";
 import {
   attachOverflowListeners,
   createSessionAttributes,
@@ -565,7 +565,7 @@ export class PromptApiInstrumentation {
     this.config = { ...DEFAULT_CAPTURE_CONFIG, ...captureConfig };
     this.providerName = providerName ?? DEFAULT_PROVIDER_NAME;
     this.tracer = (tracerProvider ?? trace.getTracerProvider()).getTracer(
-      tracerName ?? "@web-ai-otel/instrumentation-prompt-api",
+      tracerName ?? "@built-in-ai-obs/instrumentation-prompt-api",
       tracerVersion ?? "0.1.0"
     );
   }

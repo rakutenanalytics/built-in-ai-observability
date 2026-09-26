@@ -1,4 +1,4 @@
-import { WEB_AI } from "@web-ai-otel/core";
+import { WEB_AI } from "@built-in-ai-obs/core";
 
 interface ContextSummary {
   contextUsage?: number;

@@ -37,7 +37,7 @@ describe("isSpanMessage", () => {
 
   it.each([
     ["null", null],
-    ["a primitive", "web-ai-otel"],
+    ["a primitive", "built-in-ai-obs"],
     [
       "a foreign source",
       { payload: {}, source: "other", type: SPAN_MESSAGE_TYPE },

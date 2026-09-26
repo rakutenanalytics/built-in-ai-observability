@@ -1,8 +1,8 @@
 {
-  "name": "@web-ai-otel/example-vanilla",
+  "name": "@built-in-ai-obs/example-vanilla",
   "version": "0.1.0",
   "private": true,
-  "description": "Minimal vanilla JS example using the Built-in AI browser SDK",
+  "description": "Minimal vanilla JS example using the Built-in AI Observability SDK",
   "type": "module",
   "scripts": {
     "build": "vite build",
@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@web-ai-otel/sdk-browser": "workspace:*"
+    "@built-in-ai-obs/sdk-browser": "workspace:*"
   },
   "devDependencies": {
     "typescript": "catalog:",

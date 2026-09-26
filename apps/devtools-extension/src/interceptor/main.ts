@@ -1,9 +1,9 @@
+import { browserResourceAttributes } from "@built-in-ai-obs/core";
+import { ExtensionSpanExporter } from "@built-in-ai-obs/extension-transport";
+import { PromptApiInstrumentation } from "@built-in-ai-obs/instrumentation-prompt-api";
 import { resourceFromAttributes } from "@opentelemetry/resources";
 import { SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { WebTracerProvider } from "@opentelemetry/sdk-trace-web";
-import { browserResourceAttributes } from "@web-ai-otel/core";
-import { ExtensionSpanExporter } from "@web-ai-otel/extension-transport";
-import { PromptApiInstrumentation } from "@web-ai-otel/instrumentation-prompt-api";
 
 const INSTALLED_KEY = "__webAiOtelInstalled";
 

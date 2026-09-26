@@ -1,4 +1,4 @@
-import type { SerializedSpan } from "@web-ai-otel/extension-transport/protocol";
+import type { SerializedSpan } from "@built-in-ai-obs/extension-transport/protocol";
 import type {
   SessionSummary,
   StoredSpan,
@@ -6,9 +6,9 @@ import type {
 } from "../storage/indexed-db.js";
 
 /** Content-script bridge -> background. */
-export const BRIDGE_SPAN = "web-ai-otel:bridge-span";
+export const BRIDGE_SPAN = "built-in-ai-obs:bridge-span";
 /** Background -> DevTools panel. */
-export const TRACES_UPDATED = "web-ai-otel:traces-updated";
+export const TRACES_UPDATED = "built-in-ai-obs:traces-updated";
 
 export interface BridgeSpanMessage {
   payload: SerializedSpan;

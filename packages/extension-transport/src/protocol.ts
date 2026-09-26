@@ -1,6 +1,6 @@
-export const PROTOCOL_VERSION = 1;
-export const MESSAGE_SOURCE = "web-ai-otel";
-export const SPAN_MESSAGE_TYPE = "web-ai-otel:span";
+export const PROTOCOL_VERSION = 2;
+export const MESSAGE_SOURCE = "built-in-ai-obs";
+export const SPAN_MESSAGE_TYPE = "built-in-ai-obs:span";
 
 const TRACE_ID_LENGTH = 32;
 const SPAN_ID_LENGTH = 16;

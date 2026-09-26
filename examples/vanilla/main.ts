@@ -1,11 +1,14 @@
-import { readAssistantTurn, WebAISDK } from "@web-ai-otel/sdk-browser";
+import {
+  BuiltInAIObservability,
+  readAssistantTurn,
+} from "@built-in-ai-obs/sdk-browser";
 
-const sdk = new WebAISDK({
+const observability = new BuiltInAIObservability({
   captureInput: false,
   captureOutput: false,
   serviceName: "vanilla-example",
 });
-await sdk.start();
+await observability.start();
 
 const out = document.getElementById("out");
 document.getElementById("run")?.addEventListener("click", async () => {

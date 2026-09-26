@@ -1,4 +1,7 @@
-import { readAssistantTurn, WebAISDK } from "@web-ai-otel/sdk-browser";
+import {
+  BuiltInAIObservability,
+  readAssistantTurn,
+} from "@built-in-ai-obs/sdk-browser";
 import {
   buildAudioPrompt,
   buildImagePrompt,
@@ -65,14 +68,14 @@ type PlaygroundMode = "audio" | "image" | "text";
 
 if (modeInfo) {
   modeInfo.textContent = USE_SDK
-    ? `Mode: Production SDK — exporting to ${otlpUrl}${
+    ? `Mode: Built-in AI Observability SDK, exporting to ${otlpUrl}${
         experimentId ? ` (MLflow experiment ${experimentId})` : ""
       }`
-    : "Mode: Extension only (no SDK — use DevTools extension)";
+    : "Mode: Extension only (no Built-in AI Observability SDK; use DevTools extension)";
 }
 
 if (USE_SDK) {
-  const sdk = new WebAISDK({
+  const observability = new BuiltInAIObservability({
     captureInput: true,
     // MLflow builds its list previews and chat view from these; other backends
     // read the GenAI attributes and do not need them.
@@ -83,7 +86,7 @@ if (USE_SDK) {
     otlpUrl,
     serviceName: "playground",
   });
-  await sdk.start();
+  await observability.start();
 }
 
 function setOutput(text: string) {

@@ -259,13 +259,13 @@ importers:
       '@opentelemetry/sdk-trace-web':
         specifier: 'catalog:'
         version: 2.11.0(@opentelemetry/api@1.9.1)
-      '@web-ai-otel/core':
+      '@built-in-ai-obs/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@web-ai-otel/extension-transport':
+      '@built-in-ai-obs/extension-transport':
         specifier: workspace:*
         version: link:../../packages/extension-transport
-      '@web-ai-otel/instrumentation-prompt-api':
+      '@built-in-ai-obs/instrumentation-prompt-api':
         specifier: workspace:*
         version: link:../../packages/instrumentation-prompt-api
     devDependencies:
@@ -281,7 +281,7 @@ importers:
 
   apps/playground:
     dependencies:
-      '@web-ai-otel/sdk-browser':
+      '@built-in-ai-obs/sdk-browser':
         specifier: workspace:*
         version: link:../../packages/sdk-browser
     devDependencies:
@@ -294,7 +294,7 @@ importers:
 
   examples/vanilla:
     dependencies:
-      '@web-ai-otel/sdk-browser':
+      '@built-in-ai-obs/sdk-browser':
         specifier: workspace:*
         version: link:../../packages/sdk-browser
     devDependencies:
@@ -338,7 +338,7 @@ importers:
       '@opentelemetry/api':
         specifier: 'catalog:'
         version: 1.9.1
-      '@web-ai-otel/core':
+      '@built-in-ai-obs/core':
         specifier: workspace:*
         version: link:../core
     devDependencies:
@@ -376,10 +376,10 @@ importers:
       '@opentelemetry/sdk-trace-web':
         specifier: 'catalog:'
         version: 2.11.0(@opentelemetry/api@1.9.1)
-      '@web-ai-otel/core':
+      '@built-in-ai-obs/core':
         specifier: workspace:*
         version: link:../core
-      '@web-ai-otel/instrumentation-prompt-api':
+      '@built-in-ai-obs/instrumentation-prompt-api':
         specifier: workspace:*
         version: link:../instrumentation-prompt-api
 

@@ -1,4 +1,3 @@
-import type { Attributes, Context, Span } from "@opentelemetry/api";
 import {
   type AssistantTurn,
   contextAttributes,
@@ -23,7 +22,8 @@ import {
   type ToolTraffic,
   truncateAttribute,
   WEB_AI,
-} from "@web-ai-otel/core";
+} from "@built-in-ai-obs/core";
+import type { Attributes, Context, Span } from "@opentelemetry/api";
 
 const MLFLOW_INPUTS = "mlflow.spanInputs";
 const MLFLOW_OUTPUTS = "mlflow.spanOutputs";

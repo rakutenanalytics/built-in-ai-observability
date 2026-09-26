@@ -1,4 +1,4 @@
-import { GEN_AI } from "@web-ai-otel/core";
+import { GEN_AI } from "@built-in-ai-obs/core";
 import { describe, expect, it } from "vitest";
 import { spanInputs, spanOutputs } from "../src/panel/message-preview.js";
 
