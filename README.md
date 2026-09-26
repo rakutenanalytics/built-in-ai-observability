@@ -1,9 +1,8 @@
 # Built-in AI Observability
 
-This project implements observability for browser Built-in AI APIs, exported as OpenTelemetry spans.
-It is not an SDK for calling Built-in AI APIs, and it is not the [OpenTelemetry Browser SDK](https://github.com/open-telemetry/opentelemetry-browser).
+Observability for browser Built-in AI APIs, built on the [OpenTelemetry Browser SDK](https://github.com/open-telemetry/opentelemetry-browser). Instrumentation patches Built-in AI APIs in the page and exports standard OpenTelemetry spans.
 
-One shared instrumentation library, two ways to run it: the **Built-in AI Observability SDK** for in-app OTLP export, or a Chrome DevTools extension that instruments pages without code changes.
+`@built-in-ai-obs/instrumentation-prompt-api` patches `LanguageModel` and records spans for each API call. Export those spans from your app with `@built-in-ai-obs/sdk-browser` (`BuiltInAIObservability`, OTLP/HTTP), or load the Chrome DevTools extension to inject the same instrumentation at `document_start` and inspect traces in the **AI Traces** panel.
 
 ## Quick start
 
@@ -20,7 +19,6 @@ cd built-in-ai-observability
 pnpm install
 pnpm build
 ```
-
 
 
 ### Built-in AI Observability SDK
@@ -51,7 +49,7 @@ pnpm build:extension
 
 Load `apps/devtools-extension/dist` as an unpacked extension in Chrome. Open DevTools on any page using the Prompt API and select the **AI Traces** panel.
 
-The extension injects instrumentation at `document_start` in the MAIN world, before application code can capture references to the original API. The injected provider is not registered as the page's global OpenTelemetry provider.
+The extension injects instrumentation at `document_start` in the page's JavaScript context (the same realm as your application code, not the extension's isolated content script), before the app can hold references to the unpatched API. The injected provider is not registered as the page's global OpenTelemetry provider.
 
 The panel shows traces for the tab you are inspecting only. Traces drop when their tab closes; the newest 2000 traces per profile are retained. See [docs/telemetry-reference.md](./docs/telemetry-reference.md#traces-and-sessions) for trace layout and panel behavior.
 
