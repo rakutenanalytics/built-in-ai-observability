@@ -49,7 +49,7 @@ pnpm build:extension
 
 Load `apps/devtools-extension/dist` as an unpacked extension in Chrome. Open DevTools on any page using the Prompt API and select the **AI Traces** panel.
 
-The extension injects instrumentation at `document_start` in the page's JavaScript context (the same realm as your application code, not the extension's isolated content script), before the app can hold references to the unpatched API. The injected provider is not registered as the page's global OpenTelemetry provider.
+The extension injects instrumentation at `document_start` in the page context, before the app can hold references to the unpatched API. The injected provider is not registered as the page's global OpenTelemetry provider.
 
 The panel shows traces for the tab you are inspecting only. Traces drop when their tab closes; the newest 2000 traces per profile are retained. See [docs/telemetry-reference.md](./docs/telemetry-reference.md#traces-and-sessions) for trace layout and panel behavior.
 
