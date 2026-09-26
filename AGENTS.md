@@ -7,7 +7,7 @@ Instructions for coding agents working on **built-in-ai-observability** — an o
 - **Node.js:** 22.18+, 24.11+, or 26+ at build time (see `engines` in root `package.json` and `.nvmrc`; required by `tsdown`)
 - **Package manager:** pnpm 12 (see `packageManager` in root `package.json`)
 - **Build orchestration:** Turborepo (`turbo run <task>`)
-- **Lint/format:** Biome via Ultracite rules (`biome.jsonc`)
+- **Lint/format:** Ultracite (`biome.jsonc` extends `ultracite/biome/core`)
 - **Tests:** Vitest
 - **Workspace layout:**
   - `packages/*` — libraries (`@built-in-ai-obs/core`, instrumentation, SDK, extension transport)
@@ -23,15 +23,15 @@ pnpm install          # install all workspace deps
 pnpm build            # build all packages and apps
 pnpm typecheck        # tsc --noEmit across the monorepo
 pnpm test             # vitest in packages that define tests
-pnpm check            # biome lint + format check (full repo)
-pnpm format           # auto-fix lint and formatting (full repo)
-pnpm precommit        # run git pre-commit hook manually (Lefthook → Biome on staged files)
+pnpm check            # ultracite check (full repo)
+pnpm format           # ultracite fix (full repo)
+pnpm precommit        # run git pre-commit hook manually (Lefthook → Ultracite on staged files)
 pnpm dev              # watch mode (packages)
 ```
 
 Run all commands from the repository root unless working inside a single package.
 
-Git **pre-commit** hooks (via [Lefthook](https://lefthook.dev/)) run Biome on **staged** files — see `lefthook.yml`. Hooks install on `pnpm install` (`prepare` script). Run manually with `pnpm precommit`. Bypass only when intentional: `git commit --no-verify`.
+Git **pre-commit** hooks (via [Lefthook](https://lefthook.dev/)) run Ultracite on **staged** files — see `lefthook.yml`. Hooks install on `pnpm install` (`prepare` script). Run manually with `pnpm precommit`. Bypass only when intentional: `git commit --no-verify`.
 
 ## Dependency management
 
@@ -189,7 +189,7 @@ pnpm vitest run -t "specific test name"
 ## Code style
 
 - TypeScript strict mode; ESM (`"type": "module"` in library packages).
-- Formatting and lint rules are enforced by Biome (`pnpm check` / `pnpm format`).
+- Formatting and lint rules are enforced by Ultracite (`pnpm check` / `pnpm format`).
 - Match existing patterns in the file you edit — naming, imports, test style.
 - Ambient Prompt API types live in `types/prompt-api.d.ts` (shared, not `@types/dom-chromium-ai`).
 - Keep changes minimal and scoped; do not refactor unrelated code.

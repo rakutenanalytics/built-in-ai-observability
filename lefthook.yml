@@ -1,5 +1,5 @@
 pre-commit:
   commands:
-    biome:
-      run: pnpm exec biome check --write --staged --no-errors-on-unmatched
+    ultracite:
+      run: pnpm exec ultracite fix --staged
       stage_fixed: true

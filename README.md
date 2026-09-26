@@ -114,9 +114,7 @@ pnpm build:extension
 pnpm mlflow     # local MLflow server for trace viewing
 ```
 
-Pre-commit hooks ([Lefthook](https://lefthook.dev/)) run Biome on staged files after `pnpm install`. Run the hook manually with `pnpm precommit`. For emergencies: `git commit --no-verify`.
-
-Lint rules come from [Ultracite](https://github.com/haydenbleasel/ultracite) via `biome.jsonc`. Scripts call Biome directly because `ultracite check` currently fails to render diagnostics.
+Pre-commit hooks ([Lefthook](https://lefthook.dev/)) run [Ultracite](https://github.com/haydenbleasel/ultracite) on staged files after `pnpm install`. Run the hook manually with `pnpm precommit`. For emergencies: `git commit --no-verify`.
 
 ## License
 
