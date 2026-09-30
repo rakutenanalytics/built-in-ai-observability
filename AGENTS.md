@@ -11,8 +11,8 @@ Instructions for coding agents working on **built-in-ai-observability** — an o
 - **Tests:** Vitest
 - **Workspace layout:**
   - `packages/*` — libraries (`@built-in-ai-obs/core`, instrumentation, SDK, extension transport)
-  - `apps/*` — playground and Chrome DevTools extension
-  - `examples/*` — minimal consumer apps
+  - `apps/*` — Chrome DevTools extension (shipped) and the playground (internal dev harness)
+  - `examples/*` — minimal consumer apps meant to be read and copied by users
 
 Human-facing docs live in `README.md`. Span and attribute details are in `docs/telemetry-reference.md`.
 
@@ -143,7 +143,7 @@ pnpm install && pnpm build && pnpm typecheck && pnpm test && pnpm check
 
 ```bash
 pnpm dev:playground    # playground (Vite)
-pnpm dev:vanilla       # vanilla example
+pnpm dev:minimal       # minimal example
 pnpm build:extension   # then load apps/devtools-extension/dist in Chrome
 pnpm mlflow            # optional: local trace UI at http://localhost:5000/?experiment=0
 ```
@@ -156,8 +156,8 @@ Prefer root scripts when available:
 | --- | --- |
 | `pnpm dev:playground` | `@built-in-ai-obs/playground` |
 | `pnpm build:playground` | `@built-in-ai-obs/playground` |
-| `pnpm dev:vanilla` | `@built-in-ai-obs/example-vanilla` |
-| `pnpm build:vanilla` | `@built-in-ai-obs/example-vanilla` |
+| `pnpm dev:minimal` | `@built-in-ai-obs/example-minimal` |
+| `pnpm build:minimal` | `@built-in-ai-obs/example-minimal` |
 | `pnpm dev:extension` | `@built-in-ai-obs/devtools-extension` |
 | `pnpm build:extension` | `@built-in-ai-obs/devtools-extension` |
 

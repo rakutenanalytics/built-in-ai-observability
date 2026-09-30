@@ -6,7 +6,7 @@ import {
 const observability = new BuiltInAIObservability({
   captureInput: false,
   captureOutput: false,
-  serviceName: "vanilla-example",
+  serviceName: "minimal-example",
 });
 await observability.start();
 

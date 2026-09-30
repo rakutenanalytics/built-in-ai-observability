@@ -1,8 +1,8 @@
 {
-  "name": "@built-in-ai-obs/example-vanilla",
+  "name": "@built-in-ai-obs/example-minimal",
   "version": "0.1.0",
   "private": true,
-  "description": "Minimal vanilla JS example using the Built-in AI Observability SDK",
+  "description": "Minimal browser example using the Built-in AI Observability SDK",
   "type": "module",
   "scripts": {
     "build": "vite build",

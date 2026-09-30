@@ -39,7 +39,7 @@ await observability.start();
 const session = await LanguageModel.create({ … });
 ```
 
-See `examples/vanilla/` for a minimal app.
+See [`examples/minimal/`](./examples/minimal/) for a complete app.
 
 ### DevTools extension
 
@@ -54,6 +54,8 @@ The extension injects instrumentation at `document_start` in the page context, b
 The panel shows traces for the tab you are inspecting only. Traces drop when their tab closes; the newest 2000 traces per profile are retained. See [docs/telemetry-reference.md](./docs/telemetry-reference.md#traces-and-sessions) for trace layout and panel behavior.
 
 ### Playground
+
+The playground is the kitchen-sink harness used to develop this repo — it exercises every instrumentation path in one page. For code to copy into your own app, use `examples/` instead.
 
 ```bash
 pnpm dev:playground
@@ -81,8 +83,13 @@ pnpm mlflow   # http://localhost:5000, then open ?experiment=0
 | `@built-in-ai-obs/sdk-browser`                | Built-in AI Observability SDK                                             |
 | `@built-in-ai-obs/extension-transport`        | Span exporter for extension `postMessage` bridge                     |
 
+## Repository layout
 
-
+| Directory  | Contents                                                                        |
+| ---------- | ------------------------------------------------------------------------------- |
+| `packages/`| Published libraries                                                              |
+| `examples/`| Minimal apps written to be read and copied into your own project                 |
+| `apps/`    | The DevTools extension (shipped) and the playground (internal harness, not a template) |
 
 ## Privacy
 
@@ -106,7 +113,7 @@ pnpm format     # auto-fix lint and formatting (full repo)
 
 # Apps and examples
 pnpm dev:playground
-pnpm dev:vanilla
+pnpm dev:minimal
 pnpm dev:extension
 pnpm build:extension
 pnpm mlflow     # local MLflow server for trace viewing
