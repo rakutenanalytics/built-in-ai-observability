@@ -335,27 +335,52 @@ if ("LanguageModel" in globalThis) {
     setOutput(text);
   }
 
+  const previewUrls = new WeakMap<HTMLElement, string>();
+
+  function clearPreview(el: HTMLAudioElement | HTMLImageElement): void {
+    const previous = previewUrls.get(el);
+    if (previous) {
+      URL.revokeObjectURL(previous);
+      previewUrls.delete(el);
+    }
+    el.hidden = true;
+    el.removeAttribute("src");
+  }
+
+  function showPreview(
+    el: HTMLAudioElement | HTMLImageElement,
+    blob: Blob
+  ): void {
+    clearPreview(el);
+    const url = URL.createObjectURL(blob);
+    previewUrls.set(el, url);
+    el.src = url;
+    el.hidden = false;
+  }
+
   function setAudioPreview(buffer: ArrayBuffer, mimeType = "audio/webm"): void {
     audioBuffer = buffer;
-    audioPreview.hidden = false;
-    audioPreview.src = URL.createObjectURL(
-      new Blob([buffer], { type: mimeType })
-    );
+    showPreview(audioPreview, new Blob([buffer], { type: mimeType }));
   }
 
   imageFileInput.addEventListener("change", async () => {
     const file = imageFileInput.files?.[0];
     if (!file) {
       imageBitmap = null;
-      imagePreview.hidden = true;
-      imagePreview.removeAttribute("src");
+      clearPreview(imagePreview);
+      return;
+    }
+    // accept="image/*" only filters the picker dialog; it is not enforced.
+    if (!file.type.startsWith("image/")) {
+      imageBitmap = null;
+      clearPreview(imagePreview);
+      setOutput(`Unsupported image type: ${file.type || "unknown"}`);
       return;
     }
     try {
       imageBitmap?.close();
       imageBitmap = await loadImageBitmap(file);
-      imagePreview.hidden = false;
-      imagePreview.src = URL.createObjectURL(file);
+      showPreview(imagePreview, file);
     } catch (err) {
       imageBitmap = null;
       setOutput(formatError(err));
@@ -366,12 +391,17 @@ if ("LanguageModel" in globalThis) {
     const file = audioFileInput.files?.[0];
     if (!file) {
       audioBuffer = null;
-      audioPreview.hidden = true;
-      audioPreview.removeAttribute("src");
+      clearPreview(audioPreview);
+      return;
+    }
+    if (!file.type.startsWith("audio/")) {
+      audioBuffer = null;
+      clearPreview(audioPreview);
+      setOutput(`Unsupported audio type: ${file.type || "unknown"}`);
       return;
     }
     try {
-      setAudioPreview(await loadAudioBuffer(file), file.type || "audio/webm");
+      setAudioPreview(await loadAudioBuffer(file), file.type);
     } catch (err) {
       audioBuffer = null;
       setOutput(formatError(err));
@@ -450,10 +480,8 @@ if ("LanguageModel" in globalThis) {
     promptInput.value = "";
     imageFileInput.value = "";
     audioFileInput.value = "";
-    imagePreview.hidden = true;
-    imagePreview.removeAttribute("src");
-    audioPreview.hidden = true;
-    audioPreview.removeAttribute("src");
+    clearPreview(imagePreview);
+    clearPreview(audioPreview);
     setOutput("All sessions reset.");
     await ensureSession();
   });
