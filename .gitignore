@@ -45,6 +45,7 @@ Thumbs.db
 # Local tooling caches
 .cache/
 *.local
+lefthook-local.yml
 
 # MLflow (playground OTLP testing — see README)
 mlflow.db
