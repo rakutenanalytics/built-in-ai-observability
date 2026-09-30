@@ -1,0 +1,5 @@
+pre-commit:
+  commands:
+    ultracite:
+      run: pnpm exec ultracite fix --staged
+      stage_fixed: true

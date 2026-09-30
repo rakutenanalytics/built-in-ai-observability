@@ -1,0 +1,38 @@
+{
+  "name": "built-in-ai-observability",
+  "private": true,
+  "description": "Observability for browser Built-in AI APIs, exported as OpenTelemetry spans",
+  "license": "Apache-2.0",
+  "scripts": {
+    "build": "turbo run build",
+    "build:extension": "turbo run build --filter=@built-in-ai-obs/devtools-extension",
+    "build:minimal": "turbo run build --filter=@built-in-ai-obs/example-minimal",
+    "build:playground": "turbo run build --filter=@built-in-ai-obs/playground",
+    "check": "ultracite check",
+    "dev": "turbo run dev",
+    "dev:extension": "turbo run dev --filter=@built-in-ai-obs/devtools-extension",
+    "dev:minimal": "turbo run dev --filter=@built-in-ai-obs/example-minimal",
+    "dev:playground": "turbo run dev --filter=@built-in-ai-obs/playground",
+    "format": "ultracite fix",
+    "mlflow": "uvx mlflow server",
+    "precommit": "lefthook run pre-commit",
+    "prepare": "lefthook install --reset-hooks-path",
+    "test": "turbo run test",
+    "typecheck": "turbo run typecheck"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "catalog:",
+    "@types/chrome": "catalog:",
+    "@types/node": "catalog:",
+    "lefthook": "catalog:",
+    "tsdown": "catalog:",
+    "turbo": "catalog:",
+    "typescript": "catalog:",
+    "ultracite": "catalog:",
+    "vitest": "catalog:"
+  },
+  "packageManager": "pnpm@12.4.2",
+  "engines": {
+    "node": "^24.11.0 || >=26.0.0"
+  }
+}

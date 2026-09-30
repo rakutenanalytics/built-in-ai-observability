@@ -1,0 +1,886 @@
+:root {
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 13px;
+  line-height: 1.4;
+  color-scheme: light dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/*
+ * Several panels set their own `display` (grid, flex) to lay themselves out,
+ * which otherwise outranks the UA stylesheet's `[hidden] { display: none }`
+ * at equal specificity — leaving a "hidden" tab panel still visible.
+ */
+[hidden] {
+  display: none !important;
+}
+
+body {
+  margin: 0;
+  color: CanvasText;
+  background: Canvas;
+}
+
+header {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 8px 12px;
+  border-bottom: 1px solid color-mix(in srgb, CanvasText 20%, transparent);
+}
+
+.toggle-btn {
+  flex: none;
+  padding: 3px 10px;
+  font: inherit;
+  font-size: 12px;
+  color: inherit;
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid color-mix(in srgb, CanvasText 20%, transparent);
+  border-radius: 4px;
+}
+
+.toggle-btn[aria-pressed="true"] {
+  font-weight: 600;
+  background: color-mix(in srgb, Highlight 25%, transparent);
+}
+
+.view-toggle {
+  display: flex;
+}
+
+.view-toggle .toggle-btn:first-child {
+  border-radius: 4px 0 0 4px;
+}
+
+.view-toggle .toggle-btn:last-child {
+  border-left-width: 0;
+  border-radius: 0 4px 4px 0;
+}
+
+.icon-btn {
+  flex: none;
+  padding: 2px 7px;
+  font: inherit;
+  font-size: 12px;
+  color: inherit;
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid color-mix(in srgb, CanvasText 20%, transparent);
+  border-radius: 4px;
+}
+
+.icon-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, Highlight 15%, transparent);
+}
+
+.icon-btn:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
+.scope {
+  flex: 1;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 11px;
+  white-space: nowrap;
+  opacity: 0.7;
+}
+
+.actions {
+  display: flex;
+  flex: none;
+  gap: 6px;
+}
+
+/* Trace detail slides in from the right; the list stays visible underneath. */
+main {
+  min-height: calc(100vh - 41px);
+}
+
+#trace-list {
+  max-height: calc(100vh - 41px);
+  overflow: auto;
+}
+
+.time-bucket-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 8px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: color-mix(in srgb, CanvasText 70%, transparent);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: color-mix(in srgb, CanvasText 8%, Canvas);
+  border-top: 1px solid color-mix(in srgb, CanvasText 14%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, CanvasText 18%, transparent);
+  box-shadow: 0 1px 0 color-mix(in srgb, Canvas 80%, transparent);
+}
+
+.time-bucket-header:first-child {
+  border-top: 0;
+}
+
+.trace-item {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  padding: 7px 12px;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, CanvasText 10%, transparent);
+}
+
+.trace-row-top {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  min-width: 0;
+}
+
+.trace-row-right {
+  flex: none;
+  margin-left: auto;
+}
+
+.trace-row-preview {
+  display: flex;
+  gap: 12px;
+  min-width: 0;
+}
+
+.trace-row-preview .preview {
+  flex: 1 1 50%;
+  min-width: 0;
+}
+
+.trace-item:hover,
+.trace-item.active {
+  background: color-mix(in srgb, Highlight 15%, transparent);
+}
+
+.trace-item .name {
+  font-weight: 600;
+}
+
+.trace-item .meta {
+  font-size: 11px;
+  opacity: 0.75;
+}
+
+.trace-item .preview {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 11px;
+  white-space: nowrap;
+  opacity: 0.9;
+}
+
+.trace-item .preview.response {
+  opacity: 0.65;
+}
+
+.trace-item.has-error .name::after {
+  color: color-mix(in srgb, Mark 80%, red);
+  content: " ⚠";
+}
+
+.session-row {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  width: 100%;
+  padding: 6px 12px;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  background: color-mix(in srgb, CanvasText 4%, transparent);
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, CanvasText 10%, transparent);
+}
+
+.session-row:hover {
+  background: color-mix(in srgb, Highlight 12%, transparent);
+}
+
+.session-row .name {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.session-row .meta {
+  font-size: 11px;
+  opacity: 0.75;
+}
+
+.chevron {
+  flex: none;
+  width: 10px;
+  font-size: 11px;
+  opacity: 0.85;
+}
+
+.session-traces .trace-item {
+  padding-left: 30px;
+}
+
+.detail-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  padding: 0;
+  margin: 0 0 12px;
+  font-size: 11px;
+  list-style: none;
+  opacity: 0.8;
+}
+
+.drawer-backdrop {
+  --drawer-transition-duration: 260ms;
+  --drawer-transition-easing: cubic-bezier(0.22, 1, 0.36, 1);
+
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.drawer-backdrop.is-open {
+  visibility: visible;
+  pointer-events: auto;
+}
+
+/* Full-viewport dim; the sheet covers the right side as it slides in. */
+.drawer-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  padding: 0;
+  cursor: default;
+  background: color-mix(in srgb, CanvasText 40%, transparent);
+  border: 0;
+  opacity: 0;
+  transition: opacity var(--drawer-transition-duration)
+    var(--drawer-transition-easing);
+}
+
+.drawer-backdrop.is-open .drawer-scrim {
+  opacity: 1;
+}
+
+.drawer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  width: min(85%, 720px);
+  min-width: min(85%, 280px);
+  background: Canvas;
+  box-shadow: -6px 0 24px color-mix(in srgb, CanvasText 18%, transparent);
+  transform: translateX(100%);
+  transition: transform var(--drawer-transition-duration)
+    var(--drawer-transition-easing);
+}
+
+.drawer-backdrop.is-open .drawer {
+  transform: translateX(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drawer-scrim,
+  .drawer {
+    transition: none;
+  }
+}
+
+.drawer-header {
+  display: flex;
+  flex: none;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 10px;
+  border-bottom: 1px solid color-mix(in srgb, CanvasText 20%, transparent);
+}
+
+.drawer-nav {
+  display: flex;
+  flex: none;
+  gap: 2px;
+}
+
+.drawer-title {
+  flex: none;
+  margin: 0;
+  font-size: 13px;
+}
+
+.drawer-title.has-error::after {
+  color: color-mix(in srgb, Mark 80%, red);
+  content: " ⚠";
+}
+
+.drawer-summary {
+  flex: 1;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 11px;
+  white-space: nowrap;
+  opacity: 0.75;
+}
+
+.drawer-body {
+  flex: 1;
+  padding: 10px 12px;
+  overflow: auto;
+}
+
+.spans-section {
+  padding-bottom: 8px;
+  margin: 0 0 10px;
+  border-bottom: 1px solid color-mix(in srgb, CanvasText 15%, transparent);
+}
+
+.spans-header {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.spans-title {
+  margin: 0;
+  font-size: 12px;
+}
+
+.spans-controls {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.span-browser-detail {
+  min-width: 0;
+}
+
+/*
+ * Rows share one column template rather than sizing to content, so every bar
+ * measures against the same track. `auto` columns would resolve per row and
+ * leave the bars misaligned.
+ */
+.timeline-axis-row,
+.timeline-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 52px minmax(0, 1.7fr);
+  gap: 0 8px;
+  align-items: center;
+}
+
+.timeline-axis-spacer {
+  grid-column: 1 / 3;
+}
+
+.timeline-axis {
+  position: relative;
+  grid-column: 3;
+  height: 14px;
+}
+
+.timeline-tick {
+  position: absolute;
+  top: 0;
+  font-size: 10px;
+  white-space: nowrap;
+  opacity: 0.6;
+}
+
+.timeline-tick.centered {
+  transform: translateX(-50%);
+}
+
+.timeline-rows {
+  max-height: 40vh;
+  overflow: auto;
+}
+
+.timeline-row {
+  /* Buttons size to their content, which would give every row its own
+   * column widths and leave the bars out of step with the axis. */
+  width: 100%;
+  padding: 2px 4px;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+}
+
+.timeline-row:hover {
+  background: color-mix(in srgb, Highlight 12%, transparent);
+}
+
+.timeline-row.active {
+  font-weight: 600;
+  background: color-mix(in srgb, Highlight 22%, transparent);
+}
+
+.timeline-name {
+  padding-left: calc(var(--depth, 0) * 10px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.timeline-duration {
+  font-size: 10px;
+  text-align: right;
+  opacity: 0.7;
+}
+
+.timeline-track {
+  position: relative;
+  height: 16px;
+  background-image: repeating-linear-gradient(
+    to right,
+    color-mix(in srgb, CanvasText 12%, transparent) 0 1px,
+    transparent 1px var(--tick-step, 25%)
+  );
+}
+
+.timeline-bar {
+  position: absolute;
+  top: 50%;
+  min-width: 2px;
+  height: 9px;
+  background: color-mix(in srgb, Highlight 65%, CanvasText 10%);
+  border-radius: 2px;
+  transform: translateY(-50%);
+}
+
+.timeline-row.has-error .timeline-bar {
+  background: color-mix(in srgb, Mark 70%, red);
+}
+
+.timeline-row.has-error .timeline-name::after {
+  color: color-mix(in srgb, Mark 80%, red);
+  content: " ⚠";
+}
+
+.span-tree.compact {
+  padding-left: 12px;
+  margin: 0;
+  list-style: none;
+}
+
+.span-tree.compact.root {
+  max-height: 40vh;
+  padding-left: 0;
+  overflow: auto;
+}
+
+.span-node-compact {
+  margin: 1px 0;
+}
+
+.span-node-btn {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  justify-content: space-between;
+  width: 100%;
+  padding: 4px 6px;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+}
+
+.span-node-btn:hover {
+  background: color-mix(in srgb, Highlight 12%, transparent);
+}
+
+.span-node-btn.active {
+  font-weight: 600;
+  background: color-mix(in srgb, Highlight 25%, transparent);
+}
+
+.span-node-btn.has-error .span-node-name::after {
+  color: color-mix(in srgb, Mark 80%, red);
+  content: " ⚠";
+}
+
+.span-node-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.span-node-duration {
+  flex: none;
+  font-size: 10px;
+  opacity: 0.7;
+}
+
+.span-detail {
+  padding: 2px 0 0;
+}
+
+.span-detail-name {
+  margin: 0 0 6px;
+  font-size: 13px;
+}
+
+.detail-tabs {
+  margin-top: 10px;
+}
+
+.tab-list {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid color-mix(in srgb, CanvasText 15%, transparent);
+}
+
+.tab-button {
+  padding: 6px 4px;
+  margin-right: 10px;
+  font: inherit;
+  font-size: 12px;
+  color: inherit;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  opacity: 0.7;
+}
+
+.tab-button:hover {
+  opacity: 1;
+}
+
+.tab-button[aria-selected="true"] {
+  font-weight: 600;
+  border-bottom-color: Highlight;
+  opacity: 1;
+}
+
+.span-io {
+  display: grid;
+  gap: 10px;
+}
+
+.io-section {
+  padding: 0;
+}
+
+.span-io .io-section + .io-section {
+  padding-top: 12px;
+  margin-top: 4px;
+  border-top: 1px solid color-mix(in srgb, CanvasText 12%, transparent);
+}
+
+.io-header {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 0 8px;
+}
+
+.io-header-solo {
+  justify-content: flex-end;
+}
+
+.io-label {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.io-view {
+  padding: 2px 6px;
+  font: inherit;
+  font-size: 11px;
+  color: inherit;
+  background: Canvas;
+  border: 1px solid color-mix(in srgb, CanvasText 20%, transparent);
+  border-radius: 4px;
+}
+
+.io-body {
+  padding: 0;
+  margin: 0;
+}
+
+.io-body.json {
+  padding: 8px 10px;
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  word-break: break-word;
+  white-space: pre-wrap;
+  background: color-mix(in srgb, CanvasText 3%, transparent);
+  border: 1px solid color-mix(in srgb, CanvasText 12%, transparent);
+  border-radius: 6px;
+}
+
+.io-body.pretty {
+  display: grid;
+  gap: 8px;
+}
+
+.message-card {
+  padding: 8px 10px;
+  background: Canvas;
+  border: 1px solid color-mix(in srgb, CanvasText 12%, transparent);
+  border-radius: 6px;
+}
+
+.message-role {
+  margin-bottom: 4px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.message-subtitle {
+  margin: 4px 0 6px;
+  font-size: 11px;
+  opacity: 0.75;
+}
+
+.message-media {
+  display: block;
+  max-width: 100%;
+  margin-top: 6px;
+}
+
+.message-image {
+  width: auto;
+  max-height: 200px;
+  border: 1px solid color-mix(in srgb, CanvasText 12%, transparent);
+  border-radius: 4px;
+}
+
+.message-audio {
+  width: 100%;
+  height: 32px;
+}
+
+.message-media-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 72px;
+  font-size: 11px;
+  font-weight: 600;
+  background: color-mix(in srgb, CanvasText 4%, transparent);
+  border: 1px dashed color-mix(in srgb, CanvasText 20%, transparent);
+  border-radius: 6px;
+  opacity: 0.7;
+}
+
+.message-content {
+  font-size: 12px;
+  word-break: break-word;
+}
+
+.message-content.markdown {
+  display: grid;
+  gap: 0.5em;
+}
+
+.message-content.markdown p,
+.message-content.markdown pre,
+.message-content.markdown ul,
+.message-content.markdown ol,
+.message-content.markdown hr,
+.message-content.markdown h1,
+.message-content.markdown h2,
+.message-content.markdown h3,
+.message-content.markdown h4,
+.message-content.markdown h5,
+.message-content.markdown h6 {
+  margin: 0;
+}
+
+.message-content.markdown h1 {
+  font-size: 1.15em;
+}
+
+.message-content.markdown h2 {
+  font-size: 1.05em;
+}
+
+.message-content.markdown h3 {
+  font-size: 1em;
+}
+
+.message-content.markdown h4 {
+  font-size: 0.95em;
+}
+
+.message-content.markdown h5 {
+  font-size: 0.9em;
+}
+
+.message-content.markdown h6 {
+  font-size: 0.85em;
+  opacity: 0.9;
+}
+
+.message-content.markdown hr {
+  border: 0;
+  border-top: 1px solid color-mix(in srgb, CanvasText 20%, transparent);
+}
+
+.message-content.markdown ul,
+.message-content.markdown ol {
+  padding-left: 1.4em;
+}
+
+.message-content.markdown pre {
+  padding: 8px;
+  overflow-x: auto;
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  white-space: pre-wrap;
+  background: color-mix(in srgb, CanvasText 4%, transparent);
+  border-radius: 4px;
+}
+
+.message-content.markdown code {
+  padding: 0.1em 0.3em;
+  font-family: ui-monospace, monospace;
+  font-size: 0.95em;
+  background: color-mix(in srgb, CanvasText 6%, transparent);
+  border-radius: 3px;
+}
+
+.message-content.markdown pre code {
+  padding: 0;
+  font-family: inherit;
+  font-size: inherit;
+  background: none;
+}
+
+.message-content.markdown a {
+  color: LinkText;
+  text-decoration: underline;
+}
+
+.message-content.markdown .table-wrap {
+  overflow-x: auto;
+}
+
+.message-content.markdown table {
+  width: 100%;
+  font-size: 12px;
+  border-collapse: collapse;
+}
+
+.message-content.markdown th,
+.message-content.markdown td {
+  padding: 4px 8px;
+  vertical-align: top;
+  text-align: left;
+  border: 1px solid color-mix(in srgb, CanvasText 18%, transparent);
+}
+
+.message-content.markdown th {
+  font-weight: 600;
+  background: color-mix(in srgb, CanvasText 5%, transparent);
+}
+
+.role-assistant .message-role {
+  color: color-mix(in srgb, Highlight 70%, CanvasText);
+}
+
+.role-tool .message-role,
+.role-user .message-role {
+  color: color-mix(in srgb, CanvasText 80%, transparent);
+}
+
+.tool-call {
+  padding: 8px;
+  margin-top: 6px;
+  background: color-mix(in srgb, CanvasText 4%, transparent);
+  border-radius: 4px;
+}
+
+.tool-call-name {
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.tool-call-raw {
+  margin: 0;
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  white-space: pre-wrap;
+}
+
+.field-list {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 12px;
+  margin: 0;
+  font-size: 12px;
+}
+
+.field-key {
+  margin: 0;
+  font-weight: 600;
+  opacity: 0.8;
+}
+
+.field-value {
+  margin: 0;
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
+.attrs {
+  padding: 8px;
+  margin-top: 8px;
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  word-break: break-word;
+  white-space: pre-wrap;
+  background: color-mix(in srgb, CanvasText 5%, transparent);
+  border-radius: 4px;
+}
+
+.empty {
+  opacity: 0.7;
+}
+
+.list-empty {
+  padding: 12px;
+}

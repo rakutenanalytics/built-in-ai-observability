@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta content="width=device-width, initial-scale=1" name="viewport">
+    <title>AI Traces</title>
+    <link href="panel.css" rel="stylesheet">
+  </head>
+  <body>
+    <header>
+      <button
+        aria-pressed="false"
+        class="toggle-btn"
+        id="group-by-session"
+        type="button"
+      >
+        Group by session
+      </button>
+      <p class="scope" id="scope"></p>
+      <div class="actions">
+        <button id="refresh" type="button">Refresh</button>
+        <button id="export" type="button">Export JSON</button>
+        <button id="clear" type="button">Clear</button>
+      </div>
+    </header>
+    <main>
+      <section aria-label="Traces" id="trace-list"></section>
+    </main>
+    <div id="drawer-host"></div>
+    <script src="panel.js" type="module"></script>
+  </body>
+</html>

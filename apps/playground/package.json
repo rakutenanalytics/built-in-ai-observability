@@ -1,0 +1,20 @@
+{
+  "name": "@built-in-ai-obs/playground",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Playground for Built-in AI Observability",
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@built-in-ai-obs/sdk-browser": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "vite": "catalog:"
+  }
+}

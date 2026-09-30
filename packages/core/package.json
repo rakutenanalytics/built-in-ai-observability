@@ -1,0 +1,30 @@
+{
+  "name": "@built-in-ai-obs/core",
+  "version": "0.1.0",
+  "description": "Shared semantic conventions and helpers for Built-in AI Observability",
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown --watch",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@opentelemetry/api": "catalog:"
+  },
+  "devDependencies": {
+    "vitest": "catalog:"
+  }
+}

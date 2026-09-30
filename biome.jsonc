@@ -1,0 +1,57 @@
+{
+  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  "extends": ["ultracite/biome/core"],
+  "javascript": {
+    // Built-in AI APIs and the extension platform are ambient globals. The tool
+    // interfaces exist only behind chrome://flags/#prompt-api-tool-use.
+    "globals": [
+      "LanguageModel",
+      "LanguageModelToolCall",
+      "LanguageModelToolSuccess",
+      "LanguageModelToolError",
+      "chrome"
+    ]
+  },
+  "overrides": [
+    {
+      // Barrel files are the intentional public API surface of each package.
+      "includes": ["**/src/index.ts", "**/src/*/index.ts"],
+      "linter": {
+        "rules": {
+          "performance": { "noBarrelFile": "off" }
+        }
+      }
+    },
+    {
+      // Ambient DOM-style API mirrors; method signatures follow the platform.
+      "includes": ["types/prompt-api.d.ts"],
+      "linter": {
+        "rules": {
+          "style": { "useConsistentMethodSignatures": "off" }
+        }
+      }
+    },
+    {
+      // Sequential awaits are intentional in tests and the playground tool loop.
+      "includes": ["**/*.test.ts", "apps/playground/main.ts"],
+      "linter": {
+        "rules": {
+          "performance": { "noAwaitInLoops": "off" },
+          "style": { "noIncrementDecrement": "off" }
+        }
+      }
+    },
+    {
+      // Runtime guards and streaming reads; globals make static analysis noisy here.
+      "includes": [
+        "packages/instrumentation-prompt-api/src/instrumentation.ts"
+      ],
+      "linter": {
+        "rules": {
+          "performance": { "noAwaitInLoops": "off" },
+          "suspicious": { "noUnnecessaryConditions": "off" }
+        }
+      }
+    }
+  ]
+}

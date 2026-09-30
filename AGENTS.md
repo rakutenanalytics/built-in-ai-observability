@@ -1,0 +1,221 @@
+# AGENTS.md
+
+Instructions for coding agents working on **built-in-ai-observability** — an observability monorepo for browser Built-in AI APIs (Prompt API / `LanguageModel`), exporting OpenTelemetry spans.
+
+## Project overview
+
+- **Node.js:** 24.11+ or 26+ at build time (see `engines` in root `package.json` and `.nvmrc`; required by `tsdown`)
+- **Package manager:** pnpm 12 (see `packageManager` in root `package.json`)
+- **Build orchestration:** Turborepo (`turbo run <task>`)
+- **Lint/format:** Ultracite (`biome.jsonc` extends `ultracite/biome/core`)
+- **Tests:** Vitest
+- **Workspace layout:**
+  - `packages/*` — libraries (`@built-in-ai-obs/core`, instrumentation, SDK, extension transport)
+  - `apps/*` — Chrome DevTools extension (shipped) and the playground (internal dev harness)
+  - `examples/*` — minimal consumer apps meant to be read and copied by users
+
+Human-facing docs live in `README.md`. Span and attribute details are in `docs/telemetry-reference.md`.
+
+## Setup commands
+
+```bash
+pnpm install          # install all workspace deps
+pnpm build            # build all packages and apps
+pnpm typecheck        # tsc --noEmit across the monorepo
+pnpm test             # vitest in packages that define tests
+pnpm check            # ultracite check (full repo)
+pnpm format           # ultracite fix (full repo)
+pnpm precommit        # run git pre-commit hook manually (Lefthook → Ultracite on staged files)
+pnpm dev              # watch mode (packages)
+```
+
+Run all commands from the repository root unless working inside a single package.
+
+Git **pre-commit** hooks (via [Lefthook](https://lefthook.dev/)) run Ultracite on **staged** files — see `lefthook.yml`. Hooks install on `pnpm install` (`prepare` script). Run manually with `pnpm precommit`. Bypass only when intentional: `git commit --no-verify`.
+
+## Dependency management
+
+Shared dependency versions are centralized in **`pnpm-workspace.yaml`** under the `catalog:` key. Individual `package.json` files reference them with `"catalog:"`:
+
+```json
+{
+  "devDependencies": {
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}
+```
+
+**Rules for agents:**
+
+1. **Do not** duplicate version strings across `package.json` files — update the catalog instead.
+2. **Do** keep each dependency declared in the package that uses it (Turborepo needs explicit per-package deps).
+3. **Do** add new shared deps to the catalog in `pnpm-workspace.yaml` and reference them as `"catalog:"`.
+4. Root `package.json` is for repo-wide tooling only (`turbo`, `biome`, `typescript`, etc.) — not app/library runtime deps.
+5. Internal packages use `"workspace:*"` (e.g. `"@built-in-ai-obs/core": "workspace:*"`).
+
+Turborepo orchestrates tasks and caching; it does **not** manage dependency versions. Version centralization is a pnpm catalog concern.
+
+## Upgrading dependencies
+
+Follow this workflow when bumping dependencies.
+
+### 1. Check what is outdated
+
+```bash
+pnpm outdated -r
+```
+
+### 2. Update the catalog (preferred)
+
+Edit the version in `pnpm-workspace.yaml`:
+
+```yaml
+catalog:
+  typescript: ^5.10.0   # bump here
+  vitest: ^3.3.0
+```
+
+Then reinstall:
+
+```bash
+pnpm install
+```
+
+To upgrade a single catalog entry via CLI:
+
+```bash
+pnpm update -r --latest typescript
+```
+
+If pnpm warns that a catalog entry already exists, edit `pnpm-workspace.yaml` directly or use `pnpm update` as above — do not add duplicate version strings to individual `package.json` files.
+
+### 3. Upgrade all dependencies (full bump)
+
+```bash
+pnpm update -r --latest
+```
+
+Review changes to `pnpm-workspace.yaml`, `pnpm-lock.yaml`, and any resolved catalog versions. Fix breaking changes before finishing.
+
+### 4. pnpm 12 workspace settings
+
+`pnpm-workspace.yaml` also configures:
+
+- `minimumReleaseAge: 0` — allow freshly published packages (early-stage repo)
+- `allowBuilds.esbuild: true` — required for Vite native binaries
+- `allowBuilds.lefthook: true` — required for Lefthook’s postinstall binary download
+- `catalog:` — shared dependency versions (see above)
+
+### 5. Add a new shared dependency
+
+1. Add the version to `catalog:` in `pnpm-workspace.yaml`.
+2. Add `"<package>": "catalog:"` to the relevant package's `dependencies` or `devDependencies`.
+3. Run `pnpm install`.
+
+```bash
+# Example: add a dep to one package
+pnpm add some-package --filter @built-in-ai-obs/core
+# Then ensure the version in package.json is "catalog:" and the catalog entry exists
+```
+
+Library packages use **tsdown** for bundling and DTS generation (TypeScript 7 compatible). Requires **Node.js 24.11+** at build time — the bundled output is not locked to that runtime.
+
+### 6. Validate after every upgrade
+
+Run the full validation suite and fix any failures before completing the task:
+
+```bash
+pnpm install
+pnpm build
+pnpm typecheck
+pnpm test
+pnpm check
+```
+
+One-liner:
+
+```bash
+pnpm install && pnpm build && pnpm typecheck && pnpm test && pnpm check
+```
+
+### 7. Manual smoke tests (when runtime behavior may change)
+
+```bash
+pnpm dev:playground    # playground (Vite)
+pnpm dev:minimal       # minimal example
+pnpm build:extension   # then load apps/devtools-extension/dist in Chrome
+pnpm mlflow            # optional: local trace UI at http://localhost:5000/?experiment=0
+```
+
+## Running tasks for a single package
+
+Prefer root scripts when available:
+
+| Script | Package |
+| --- | --- |
+| `pnpm dev:playground` | `@built-in-ai-obs/playground` |
+| `pnpm build:playground` | `@built-in-ai-obs/playground` |
+| `pnpm dev:minimal` | `@built-in-ai-obs/example-minimal` |
+| `pnpm build:minimal` | `@built-in-ai-obs/example-minimal` |
+| `pnpm dev:extension` | `@built-in-ai-obs/devtools-extension` |
+| `pnpm build:extension` | `@built-in-ai-obs/devtools-extension` |
+
+For other packages, use Turborepo filters:
+
+```bash
+turbo run build --filter=@built-in-ai-obs/core
+turbo run test --filter=@built-in-ai-obs/instrumentation-prompt-api
+turbo run build --affected   # only changed packages + dependents
+```
+
+Or `pnpm --filter <package-name> <script>` when a root alias does not exist.
+
+## Testing instructions
+
+- Tests live next to source as `*.test.ts` under each package's `test/` directory.
+- `pnpm test` runs vitest via Turbo; packages without tests are skipped.
+- `@built-in-ai-obs/sdk-browser` uses `vitest run --passWithNoTests`.
+- After code changes, run tests for the affected package at minimum; prefer the full `pnpm test` before finishing.
+
+Run a single test file or pattern from a package directory:
+
+```bash
+cd packages/core
+pnpm vitest run test/tools.test.ts
+pnpm vitest run -t "specific test name"
+```
+
+## Code style
+
+- TypeScript strict mode; ESM (`"type": "module"` in library packages).
+- Formatting and lint rules are enforced by Ultracite (`pnpm check` / `pnpm format`).
+- Match existing patterns in the file you edit — naming, imports, test style.
+- Ambient Prompt API types live in `types/prompt-api.d.ts` (shared, not `@types/dom-chromium-ai`).
+- Keep changes minimal and scoped; do not refactor unrelated code.
+
+## Commit and PR guidelines
+
+- Do not create commits unless explicitly asked.
+- Do not push unless explicitly asked.
+- After dependency upgrades, the commit should include `pnpm-workspace.yaml`, `pnpm-lock.yaml`, and any `package.json` changes.
+- Suggested commit message style: `chore(deps): bump <package> to <version>` or `chore(deps): upgrade dependencies`.
+
+## Common pitfalls
+
+- **Repeating versions in package.json** — always use `catalog:` for shared deps.
+- **Installing app deps at the root** — install in the package that uses them.
+- **Skipping `pnpm install` after catalog edits** — lockfile must be updated.
+- **Using `turbo build` in scripts** — use `turbo run build` in `package.json` and CI.
+- **OpenTelemetry version skew** — keep `@opentelemetry/*` packages on compatible versions; bump them together in the catalog.
+
+<!-- BEGIN:turborepo-agent-rules -->
+
+# This is NOT the Turborepo you know
+
+Turborepo configuration, task behavior, and CLI commands can vary between installed versions and may differ from your training data. Resolve the `turbo` package from this file's directory or relevant workspace; in monorepos, it may not be visible from the repository root. For example, run `node -p "require.resolve('turbo/package.json')"` from a workspace that depends on `turbo`.
+
+Read `docs/README.md` inside that installed package first, then read the relevant pages from its `docs/` directory before changing Turborepo configuration or commands. Heed deprecation notices. These bundled docs match the installed package version and are available without network access.
+
+This block is written and re-added by `turbo` before repository-scoped commands when an AI agent is detected. In the Turborepo source repository, its template is defined in `crates/turborepo-cli/src/cli/agent_guidance.rs`. Removing the managed block while updates are enabled means a later qualifying invocation will add it again. Set `"agentGuidance": false` in the root `turbo.json` or `turbo.jsonc` to opt out; this does not remove an existing block. Keep the block committed with your work to avoid an uncommitted change on the next agent invocation.
+<!-- END:turborepo-agent-rules -->

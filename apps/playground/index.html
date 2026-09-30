@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta content="width=device-width, initial-scale=1" name="viewport">
+    <title>Built-in AI Observability Playground</title>
+    <style>
+    body {
+      max-width: 720px;
+      padding: 0 1rem;
+      margin: 2rem auto;
+      font-family: system-ui, sans-serif;
+    }
+    textarea {
+      width: 100%;
+      min-height: 80px;
+    }
+    #output {
+      padding: 1rem;
+      white-space: pre-wrap;
+      background: #f4f4f5;
+      border-radius: 6px;
+    }
+    .mode {
+      padding: 0.5rem;
+      margin-bottom: 1rem;
+      background: #eef2ff;
+      border-radius: 4px;
+    }
+    .mode-tabs {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+    .mode-tabs button {
+      padding: 0.4rem 0.75rem;
+      font: inherit;
+      cursor: pointer;
+      background: #f4f4f5;
+      border: 1px solid #d4d4d8;
+      border-radius: 4px;
+    }
+    .mode-tabs button[aria-selected="true"] {
+      font-weight: 600;
+      background: #eef2ff;
+      border-color: #a5b4fc;
+    }
+    .panel {
+      display: grid;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+    .panel[hidden] {
+      display: none;
+    }
+    .panel label {
+      display: grid;
+      gap: 0.35rem;
+    }
+    .panel-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    #image-preview {
+      max-width: 100%;
+      max-height: 240px;
+      object-fit: contain;
+      background: #fafafa;
+      border: 1px solid #e4e4e7;
+      border-radius: 6px;
+    }
+    #audio-preview {
+      width: 100%;
+    }
+    .hint {
+      margin: 0;
+      font-size: 0.9rem;
+      opacity: 0.85;
+    }
+    .tool-help {
+      padding: 0.75rem;
+      font-size: 0.9rem;
+      background: #f4f4f5;
+      border: 1px solid #e4e4e7;
+      border-radius: 6px;
+    }
+    .tool-help summary {
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .tool-help ul {
+      padding-left: 1.25rem;
+      margin: 0.5rem 0;
+    }
+    .tool-help p {
+      margin: 0.5rem 0 0;
+    }
+    .example-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-top: 0.5rem;
+    }
+    .example-buttons button {
+      padding: 0.35rem 0.6rem;
+      font: inherit;
+      font-size: 0.85rem;
+      cursor: pointer;
+      background: #fff;
+      border: 1px solid #d4d4d8;
+      border-radius: 4px;
+    }
+    .example-buttons button:hover {
+      background: #eef2ff;
+      border-color: #a5b4fc;
+    }
+    </style>
+  </head>
+  <body>
+    <h1>Built-in AI Observability Playground</h1>
+    <p class="mode" id="mode-info">Loading…</p>
+    <p>
+      Test the Prompt API with or without the Built-in AI Observability SDK.
+      Load the
+      <strong>Built-in AI Traces</strong>
+      DevTools extension to observe unmodified pages.
+    </p>
+
+    <div aria-label="Input mode" class="mode-tabs" role="tablist">
+      <button aria-selected="true" data-mode="text" role="tab" type="button">
+        Text
+      </button>
+      <button aria-selected="false" data-mode="image" role="tab" type="button">
+        Image
+      </button>
+      <button aria-selected="false" data-mode="audio" role="tab" type="button">
+        Audio
+      </button>
+    </div>
+
+    <section aria-labelledby="text-heading" class="panel" id="panel-text">
+      <h2 id="text-heading">Text</h2>
+      <form id="form">
+        <label>
+          Prompt
+          <textarea id="prompt"></textarea>
+        </label>
+        <div class="panel-actions">
+          <button type="submit">Send</button>
+          <button id="stream" type="button">Stream</button>
+          <button id="tool-call" type="button">Tool call</button>
+          <button id="clone" type="button">Clone session</button>
+          <button id="reset" type="button">Reset session</button>
+        </div>
+      </form>
+      <details class="tool-help">
+        <summary>Tool call testing</summary>
+        <p>
+          Click <strong>Tool call</strong> to run a multi-round exchange. Needs
+          <code>chrome://flags/#prompt-api-tool-use</code>
+          and a browser restart. One trace records several
+          <code>generate_content</code>
+          spans plus an
+          <code>execute_tool</code>
+          span per call.
+        </p>
+        <p>
+          <strong>Available tools</strong>
+          (cities: Tokyo, Kyoto, Osaka only):
+        </p>
+        <ul>
+          <li><code>get_weather</code>— current conditions and temperature</li>
+          <li><code>get_population</code>— population for a city</li>
+        </ul>
+        <p>
+          Ask a question that needs one or both tools, then click
+          <strong>Tool call</strong>. An empty prompt uses the Kyoto example
+          below.
+        </p>
+        <p><strong>Example prompts</strong> (click to fill the box):</p>
+        <div class="example-buttons" id="tool-examples"></div>
+      </details>
+    </section>
+
+    <section
+      aria-labelledby="image-heading"
+      class="panel"
+      hidden
+      id="panel-image"
+    >
+      <h2 id="image-heading">Image</h2>
+      <p class="hint">
+        Multimodal image input needs Prompt API image support in your Chrome
+        build. See
+        <a
+          href="https://developer.chrome.com/docs/ai/prompt-api#multimodal_capabilities"
+          >multimodal capabilities</a
+        >. Traces record image parts as redacted metadata only.
+      </p>
+      <label>
+        Image file
+        <input accept="image/*" id="image-file" type="file">
+      </label>
+      <img alt="" hidden id="image-preview">
+      <label>
+        Prompt
+        <textarea id="image-prompt">Describe this image in detail.</textarea>
+      </label>
+      <div class="panel-actions">
+        <button id="image-send" type="button">Send</button>
+        <button id="image-stream" type="button">Stream</button>
+      </div>
+    </section>
+
+    <section
+      aria-labelledby="audio-heading"
+      class="panel"
+      hidden
+      id="panel-audio"
+    >
+      <h2 id="audio-heading">Audio</h2>
+      <p class="hint">
+        Multimodal audio input needs Prompt API audio support in your Chrome
+        build. Traces record audio parts as redacted metadata only.
+      </p>
+      <div class="panel-actions">
+        <button id="audio-record" type="button">Record 5s</button>
+      </div>
+      <label>
+        Or choose an audio file
+        <input accept="audio/*" id="audio-file" type="file">
+      </label>
+      <audio controls hidden id="audio-preview">
+        <track default kind="captions" label="Preview" srclang="en">
+      </audio>
+      <label>
+        Prompt
+        <textarea id="audio-prompt">Transcribe this audio.</textarea>
+      </label>
+      <div class="panel-actions">
+        <button id="audio-send" type="button">Send</button>
+        <button id="audio-stream" type="button">Stream</button>
+      </div>
+    </section>
+
+    <h2>Output</h2>
+    <div id="output"></div>
+    <script src="/main.ts" type="module"></script>
+  </body>
+</html>
