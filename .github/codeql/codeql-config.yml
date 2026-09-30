@@ -1,0 +1,9 @@
+name: Built-in AI Observability
+
+queries:
+  - uses: security-extended
+
+# apps/playground and examples/ stay in scope on purpose: the playground is
+# real browser code, and examples are copied verbatim by users.
+paths-ignore:
+  - "**/test/**"
