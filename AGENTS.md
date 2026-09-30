@@ -4,7 +4,7 @@ Instructions for coding agents working on **built-in-ai-observability** — an o
 
 ## Project overview
 
-- **Node.js:** 24.11+ or 26+ at build time (see `engines` in root `package.json` and `.nvmrc`; required by `tsdown`)
+- **Node.js:** 26+ at build time only (see `engines` in root `package.json` and `.nvmrc`). The repo tracks the newest Node line rather than supporting a range; published packages are browser code and are not tied to it.
 - **Package manager:** pnpm 12 (see `packageManager` in root `package.json`)
 - **Build orchestration:** Turborepo (`turbo run <task>`)
 - **Lint/format:** Ultracite (`biome.jsonc` extends `ultracite/biome/core`)
@@ -119,7 +119,18 @@ pnpm add some-package --filter @built-in-ai-obs/core
 # Then ensure the version in package.json is "catalog:" and the catalog entry exists
 ```
 
-Library packages use **tsdown** for bundling and DTS generation (TypeScript 7 compatible). Requires **Node.js 24.11+** at build time — the bundled output is not locked to that runtime.
+Library packages use **tsdown** for bundling and DTS generation (TypeScript 7 compatible). Requires **Node.js 26+** at build time — the bundled output is not locked to that runtime.
+
+### Bumping the Node major (coupled change)
+
+`@types/node` pins the Node major the build targets, so raising it alone would let TypeScript accept APIs the declared runtime does not have. Dependabot proposes the typings bump but cannot update the rest. Move all four together in one commit:
+
+1. `"@types/node"` in `pnpm-workspace.yaml` (catalog)
+2. `engines.node` in root `package.json`
+3. `.nvmrc` (drives CI via `node-version-file`)
+4. The Node line in `README.md` prerequisites and in this file
+
+Then `pnpm install` and run the full validation suite.
 
 ### 6. Validate after every upgrade
 
@@ -199,7 +210,7 @@ pnpm vitest run -t "specific test name"
 - Do not create commits unless explicitly asked.
 - Do not push unless explicitly asked.
 - After dependency upgrades, the commit should include `pnpm-workspace.yaml`, `pnpm-lock.yaml`, and any `package.json` changes.
-- Suggested commit message style: `chore(deps): bump <package> to <version>` or `chore(deps): upgrade dependencies`.
+- Routine dependency bumps come from Dependabot and keep its default `build(deps):` prefix. Hand-written dependency commits should match it.
 
 ## Common pitfalls
 
