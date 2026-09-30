@@ -5,6 +5,12 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    ignore:
+      # Typings track the lowest Node major in `engines`, so that TypeScript
+      # cannot accept APIs missing from the oldest runtime we support.
+      # Raise this deliberately alongside the engines floor.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "github-actions"
     directory: "/"
