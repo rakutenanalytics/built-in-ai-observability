@@ -8,7 +8,7 @@ Observability for browser Built-in AI APIs, built on the [OpenTelemetry Browser 
 
 ### Prerequisites
 
-- Node.js 24.11+ or 26+ (required for `tsdown` builds; see `.nvmrc`)
+- Node.js 26+ (build time only; see `.nvmrc`)
 - pnpm 12+
 - [Browser with Prompt API support](https://developer.mozilla.org/en-US/docs/Web/API/Prompt_API#browser_compatibility) (for live testing)
 
