@@ -58,8 +58,6 @@ export const WEB_AI = {
    * shape of an exchange stays visible without its payloads.
    */
   TOOL_CALL_COUNT: "web_ai.tool.call_count",
-  /** Chrome leaves `callID` empty, so calls are identified by position. */
-  TOOL_CALL_INDEX: "web_ai.tool.call_index",
   TOOL_CALL_NAMES: "web_ai.tool.call_names",
   /** Tools declared on the session. */
   TOOL_COUNT: "web_ai.tool.count",

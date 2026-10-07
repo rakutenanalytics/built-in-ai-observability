@@ -83,6 +83,11 @@ export const tools: PlaygroundTool[] = [
 
 export const toolsByName = new Map(tools.map((tool) => [tool.name, tool]));
 
+/** What the session is told about: the page runs the tools, not the browser. */
+export const toolDeclarations: LanguageModelToolDeclaration[] = tools.map(
+  ({ description, inputSchema, name }) => ({ description, inputSchema, name })
+);
+
 export const TOOL_SYSTEM_PROMPT =
   "You answer questions about cities by calling the tools you have. Call " +
   "every tool you need in one turn, then answer in one short sentence using " +

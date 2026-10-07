@@ -13,8 +13,8 @@
 export interface ToolCallInfo {
   arguments?: unknown;
   /**
-   * Chrome currently leaves this empty, even for several calls in one turn, so
-   * it cannot be used to tell calls apart. Kept because the spec defines it.
+   * `callId`, which the response repeats. The spec requires it to be non-empty,
+   * but Chrome 157 still sends `""`.
    */
   id: string;
   name: string;
@@ -75,7 +75,7 @@ export function readToolCall(value: unknown): ToolCallInfo | undefined {
   }
   return {
     arguments: fields.arguments,
-    id: stringField(fields, "callID") ?? "",
+    id: stringField(fields, "callId") ?? "",
     name,
   };
 }
@@ -87,7 +87,7 @@ export function readToolResponse(value: unknown): ToolResponseInfo | undefined {
     return;
   }
 
-  const id = stringField(fields, "callID") ?? "";
+  const id = stringField(fields, "callId") ?? "";
   const errorMessage = stringField(fields, "errorMessage");
   if (errorMessage !== undefined) {
     return { errorMessage, id, name };

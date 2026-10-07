@@ -23,7 +23,7 @@ function onPrototype<T>(fields: Record<string, unknown>): T {
 const weatherCall = () =>
   onPrototype<unknown>({
     arguments: { city: "Tokyo" },
-    callID: "",
+    callId: "call-1",
     name: "get_weather",
   });
 
@@ -31,14 +31,14 @@ describe("readToolCall", () => {
   it("reads fields held on the prototype", () => {
     expect(readToolCall(weatherCall())).toEqual({
       arguments: { city: "Tokyo" },
-      id: "",
+      id: "call-1",
       name: "get_weather",
     });
   });
 
-  it("keeps a call id when one is provided", () => {
+  it("does not read the pre-rename callID key", () => {
     const call = onPrototype<unknown>({ callID: "abc", name: "t" });
-    expect(readToolCall(call)?.id).toBe("abc");
+    expect(readToolCall(call)?.id).toBe("");
   });
 
   it("rejects values that are not tool calls", () => {
@@ -51,13 +51,13 @@ describe("readToolCall", () => {
 describe("readToolResponse", () => {
   it("reads a success and keeps the result parts", () => {
     const success = onPrototype<unknown>({
-      callID: "",
+      callId: "call-1",
       name: "get_weather",
       result: [{ type: "object", value: { tempC: 24 } }],
     });
 
     expect(readToolResponse(success)).toEqual({
-      id: "",
+      id: "call-1",
       name: "get_weather",
       result: [{ type: "object", value: { tempC: 24 } }],
     });
@@ -65,7 +65,7 @@ describe("readToolResponse", () => {
 
   it("reads a failure and reports no result", () => {
     const failure = onPrototype<unknown>({
-      callID: "",
+      callId: "",
       errorMessage: 'missing "city"',
       name: "get_weather",
     });
@@ -91,7 +91,7 @@ describe("toolCallFromChunk", () => {
 describe("toolTrafficFrom", () => {
   it("finds tool responses carried by a user message", () => {
     const response = onPrototype<unknown>({
-      callID: "",
+      callId: "",
       name: "get_weather",
       result: [{ type: "object", value: { tempC: 24 } }],
     });
@@ -143,7 +143,7 @@ describe("readAssistantTurn", () => {
 describe("tool message encoding", () => {
   it("encodes a tool response as a tool_call_response part", () => {
     const response = onPrototype<unknown>({
-      callID: "",
+      callId: "",
       name: "get_weather",
       result: [{ type: "object", value: { tempC: 24 } }],
     });
@@ -164,7 +164,7 @@ describe("tool message encoding", () => {
 
   it("encodes a tool failure as an error rather than a response", () => {
     const failure = onPrototype<unknown>({
-      callID: "",
+      callId: "",
       errorMessage: "boom",
       name: "get_weather",
     });

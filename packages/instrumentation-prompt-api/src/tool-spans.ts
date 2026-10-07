@@ -34,14 +34,14 @@ function safeJson(value: unknown, maxLength: number): string | undefined {
 }
 
 /**
- * Remembers the calls a turn asked for, and hands each one an id. They stay
- * pending until the page sends results back, which is the only moment their
- * duration becomes known.
+ * Remembers the calls a turn asked for. They stay pending until the page sends
+ * results back, which is the only moment their duration becomes known.
  *
- * Chrome leaves `callID` empty, so a synthetic id is filled in: without one,
- * nothing ties the `tool_call` part recorded on the turn to the `execute_tool`
- * span that answers it. The calls are returned with those ids so the turn can
- * describe itself in the same terms as the spans that follow.
+ * The spec requires a non-empty `callId`, but Chrome 157 still sends `""`. A
+ * call without one is given an id here, so the `tool_call` part recorded on the
+ * turn and the `execute_tool` span that answers it can still be joined. The
+ * calls are returned with those ids so the turn describes itself in the same
+ * terms as the spans that follow. A real `callId` is always kept as is.
  *
  * Every call of a turn is stamped with `runnableAt`, the moment the turn
  * finished, not the moment it appeared. While streaming, a call arrives as soon
@@ -56,14 +56,17 @@ export function registerToolCalls(
   runnableAt: number
 ): ToolCallInfo[] {
   return calls.map((call) => {
-    state.toolCallSeq += 1;
+    const generatedId = !call.id;
+    if (generatedId) {
+      state.generatedCallSeq += 1;
+    }
     const identified: ToolCallInfo = {
       ...call,
-      id: call.id || `${state.sessionId}-${state.toolCallSeq}`,
+      id: call.id || `${state.sessionId}-${state.generatedCallSeq}`,
     };
     state.pendingCalls.push({
       ...identified,
-      index: state.toolCallSeq,
+      generatedId,
       parent,
       runnableAt,
       turnIndex: state.turnIndex,
@@ -73,25 +76,23 @@ export function registerToolCalls(
 }
 
 /**
- * Finds the call a response answers. `callID` would say so, but Chrome leaves
- * it empty on both sides, so the name is matched instead and identical names
- * fall back to the order they were requested in.
+ * Finds the call a response answers, by the `callId` both carry.
+ *
+ * A response without one can only be answering a call that had none either, so
+ * it is matched by name among those, oldest first. A response with an id that
+ * matches nothing gets no call: borrowing one by name would hand it another
+ * call's arguments and start time.
  */
 function takePendingCall(
   state: SessionState,
   response: ToolResponseInfo
 ): PendingToolCall | undefined {
   const { pendingCalls } = state;
-  const byId = response.id
+  const at = response.id
     ? pendingCalls.findIndex((call) => call.id === response.id)
-    : -1;
-  const at =
-    byId >= 0
-      ? byId
-      : pendingCalls.findIndex((call) => call.name === response.name);
-
-  // A response that matches nothing must not consume some other call's record,
-  // or the next response inherits its arguments and its start time.
+    : pendingCalls.findIndex(
+        (call) => call.generatedId && call.name === response.name
+      );
   if (at < 0) {
     return;
   }
@@ -114,14 +115,13 @@ function toolSpanAttributes(
     [GEN_AI.TOOL_TYPE]: TOOL_TYPE_FUNCTION,
   };
 
-  // The response's own id when the model set one, otherwise the id handed to
-  // the call, which is what the turn's tool_call part carries.
+  // The response's own id when it has one, otherwise the id given to the call,
+  // which is what the turn's tool_call part carries.
   const callId = response.id || pending?.id;
   if (callId) {
     attributes[GEN_AI.TOOL_CALL_ID] = callId;
   }
   if (pending) {
-    attributes[WEB_AI.TOOL_CALL_INDEX] = pending.index;
     attributes[WEB_AI.TURN_INDEX] = pending.turnIndex;
   }
 

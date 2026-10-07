@@ -71,13 +71,13 @@ interface LanguageModelToolDeclaration {
 }
 
 /**
- * A tool the model wants run. Chrome currently leaves `callID` an empty string,
- * including when several calls arrive in one turn, so it cannot be used to tell
- * calls apart.
+ * A tool the model wants run. The spec requires `callId` to be non-empty, and a
+ * response answers the call whose `callId` it repeats. Chrome 157 still sends
+ * an empty string.
  */
 interface LanguageModelToolCall {
   readonly arguments: Record<string, unknown>;
-  readonly callID: string;
+  readonly callId: string;
   readonly name: string;
 }
 
@@ -88,13 +88,13 @@ interface LanguageModelToolResultContent {
 }
 
 interface LanguageModelToolSuccess {
-  readonly callID: string;
+  readonly callId: string;
   readonly name: string;
   readonly result: LanguageModelToolResultContent[];
 }
 
 interface LanguageModelToolError {
-  readonly callID: string;
+  readonly callId: string;
   readonly errorMessage: string;
   readonly name: string;
 }
@@ -203,7 +203,7 @@ declare const LanguageModel: LanguageModelConstructor;
 declare const LanguageModelToolSuccess: {
   prototype: LanguageModelToolSuccess;
   new (init: {
-    callID: string;
+    callId: string;
     name: string;
     result: LanguageModelToolResultContent[];
   }): LanguageModelToolSuccess;
@@ -212,7 +212,7 @@ declare const LanguageModelToolSuccess: {
 declare const LanguageModelToolError: {
   prototype: LanguageModelToolError;
   new (init: {
-    callID: string;
+    callId: string;
     name: string;
     errorMessage: string;
   }): LanguageModelToolError;

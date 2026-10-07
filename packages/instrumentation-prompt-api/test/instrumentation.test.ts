@@ -71,15 +71,18 @@ const endedAt = (span: ReadableSpan | undefined): number =>
  * The real tool interfaces keep every field on the prototype, so `Object.keys()`
  * sees nothing. These doubles do the same, which is what the encoders have to
  * cope with.
+ *
+ * The default id comes from the tool name, so a call and its response pair up
+ * unless a test says otherwise.
  */
 function toolCall(
   name: string,
   args: Record<string, unknown>,
-  callID = ""
+  callId = `call-${name}`
 ): LanguageModelToolCall {
   return Object.create({
     arguments: args,
-    callID,
+    callId,
     name,
   }) as LanguageModelToolCall;
 }
@@ -87,10 +90,10 @@ function toolCall(
 function toolSuccess(
   name: string,
   value: unknown,
-  callID = ""
+  callId = `call-${name}`
 ): LanguageModelToolSuccess {
   return Object.create({
-    callID,
+    callId,
     name,
     result: [{ type: "object", value }],
   }) as LanguageModelToolSuccess;
@@ -99,10 +102,10 @@ function toolSuccess(
 function toolError(
   name: string,
   errorMessage: string,
-  callID = ""
+  callId = `call-${name}`
 ): LanguageModelToolError {
   return Object.create({
-    callID,
+    callId,
     errorMessage,
     name,
   }) as LanguageModelToolError;
@@ -599,7 +602,6 @@ describe("PromptApiInstrumentation", () => {
       expect(toolSpan?.attributes["gen_ai.tool.description"]).toBe(
         WEATHER_TOOL.description
       );
-      expect(toolSpan?.attributes["web_ai.tool.call_index"]).toBe(1);
       expect(String(toolSpan?.attributes["gen_ai.tool.call.result"])).toContain(
         "24"
       );
@@ -782,35 +784,35 @@ describe("PromptApiInstrumentation", () => {
       expect(output).not.toContain("[object Object]");
     });
 
-    it("pairs parallel calls with their responses by name", async () => {
+    it("pairs calls to the same tool with their own responses", async () => {
       mockSession.prompt = vi
         .fn()
         .mockResolvedValueOnce([
-          toolCallChunk(toolCall("get_weather", { city: "Kyoto" })),
-          toolCallChunk(toolCall("get_population", { city: "Kyoto" })),
+          toolCallChunk(toolCall("get_weather", { city: "Paris" }, "call-1")),
+          toolCallChunk(toolCall("get_weather", { city: "Tokyo" }, "call-2")),
         ])
-        .mockResolvedValueOnce("Kyoto is clear, with 1.4M people.");
+        .mockResolvedValueOnce("Paris is mild and Tokyo is cool.");
 
       const session = await LanguageModel.create({ tools: [WEATHER_TOOL] });
-      await session.prompt("weather and population of Kyoto?");
+      await session.prompt("weather in Paris and Tokyo?");
+      // Answered in the opposite order, which the name alone cannot untangle.
       await session.prompt(
         toolResponseTurn(
-          toolSuccess("get_population", { people: 1_400_000 }),
-          toolSuccess("get_weather", { tempC: 22 })
+          toolSuccess("get_weather", { tempC: 12 }, "call-2"),
+          toolSuccess("get_weather", { tempC: 18 }, "call-1")
         )
       );
 
       const spans = toolSpans();
       expect(spans).toHaveLength(2);
-      // Both callIDs are empty and the answers came back in the opposite order,
-      // so only the name can pair them up.
-      expect(spans.map((span) => span.attributes["gen_ai.tool.name"])).toEqual([
-        "get_population",
-        "get_weather",
-      ]);
       expect(
-        spans.map((span) => span.attributes["web_ai.tool.call_index"])
-      ).toEqual([2, 1]);
+        spans.map((span) => span.attributes["gen_ai.tool.call.id"])
+      ).toEqual(["call-2", "call-1"]);
+      expect(
+        spans.map((span) =>
+          JSON.parse(String(span.attributes["gen_ai.tool.call.arguments"]))
+        )
+      ).toEqual([{ city: "Tokyo" }, { city: "Paris" }]);
     });
 
     it("marks a failed tool with an error status", async () => {
@@ -943,33 +945,7 @@ describe("PromptApiInstrumentation", () => {
       expect(durationMs(toolSpan)).toBeGreaterThan(0);
     });
 
-    it("labels a call and its tool span with the same id", async () => {
-      mockSession.prompt = vi
-        .fn()
-        .mockResolvedValueOnce([
-          toolCallChunk(toolCall("get_weather", { city: "Hakone" })),
-        ])
-        .mockResolvedValueOnce("It is misty in Hakone.");
-
-      const session = await LanguageModel.create({ tools: [WEATHER_TOOL] });
-      await session.prompt("weather in Hakone?");
-      await session.prompt(
-        toolResponseTurn(toolSuccess("get_weather", { tempC: 14 }))
-      );
-
-      const [turn] = turnSpans();
-      const [toolSpan] = toolSpans();
-      const callId = toolSpan?.attributes["gen_ai.tool.call.id"];
-
-      // Chrome sends no callID, so the instrumentation issues one; without it
-      // nothing joins the turn that asked to the span that answered.
-      expect(callId).toBeTruthy();
-      expect(String(turn?.attributes["gen_ai.output.messages"])).toContain(
-        String(callId)
-      );
-    });
-
-    it("keeps the model's own call id when it sends one", async () => {
+    it("labels a call and its tool span with the model's call id", async () => {
       mockSession.prompt = vi
         .fn()
         .mockResolvedValueOnce([
@@ -983,8 +959,114 @@ describe("PromptApiInstrumentation", () => {
         toolResponseTurn(toolSuccess("get_weather", { tempC: -2 }, "call-7"))
       );
 
+      const [turn] = turnSpans();
       const [toolSpan] = toolSpans();
+      // The id is what joins the turn that asked to the span that answered.
       expect(toolSpan?.attributes["gen_ai.tool.call.id"]).toBe("call-7");
+      expect(String(turn?.attributes["gen_ai.output.messages"])).toContain(
+        "call-7"
+      );
+    });
+
+    it("does not pair a response with a call by name alone", async () => {
+      mockSession.prompt = vi
+        .fn()
+        .mockResolvedValueOnce([
+          toolCallChunk(toolCall("get_weather", { city: "Nikko" }, "call-1")),
+        ])
+        .mockResolvedValueOnce("Cool in Nikko.");
+
+      const session = await LanguageModel.create({ tools: [WEATHER_TOOL] });
+      await session.prompt("weather in Nikko?");
+      await session.prompt(
+        toolResponseTurn(toolSuccess("get_weather", { tempC: 9 }, "call-9"))
+      );
+
+      const [toolSpan] = toolSpans();
+      expect(toolSpan?.attributes["gen_ai.tool.call.id"]).toBe("call-9");
+      expect(
+        toolSpan?.attributes["gen_ai.tool.call.arguments"]
+      ).toBeUndefined();
+    });
+
+    it("gives a call Chrome sent without an id one of its own", async () => {
+      mockSession.prompt = vi
+        .fn()
+        .mockResolvedValueOnce([
+          toolCallChunk(toolCall("get_weather", { city: "Hakone" }, "")),
+        ])
+        .mockResolvedValueOnce("It is misty in Hakone.");
+
+      const session = await LanguageModel.create({ tools: [WEATHER_TOOL] });
+      await session.prompt("weather in Hakone?");
+      await session.prompt(
+        toolResponseTurn(toolSuccess("get_weather", { tempC: 14 }, ""))
+      );
+
+      const [turn] = turnSpans();
+      const [toolSpan] = toolSpans();
+      const callId = toolSpan?.attributes["gen_ai.tool.call.id"];
+
+      // Without it nothing joins the turn that asked to the span that answered.
+      expect(callId).toBeTruthy();
+      expect(String(turn?.attributes["gen_ai.output.messages"])).toContain(
+        String(callId)
+      );
+      expect(
+        String(toolSpan?.attributes["gen_ai.tool.call.arguments"])
+      ).toContain("Hakone");
+    });
+
+    it("pairs calls Chrome sent without an id by name", async () => {
+      mockSession.prompt = vi
+        .fn()
+        .mockResolvedValueOnce([
+          toolCallChunk(toolCall("get_weather", { city: "Kyoto" }, "")),
+          toolCallChunk(toolCall("get_population", { city: "Kyoto" }, "")),
+        ])
+        .mockResolvedValueOnce("Kyoto is clear, with 1.4M people.");
+
+      const session = await LanguageModel.create({ tools: [WEATHER_TOOL] });
+      await session.prompt("weather and population of Kyoto?");
+      await session.prompt(
+        toolResponseTurn(
+          toolSuccess("get_population", { people: 1_400_000 }, ""),
+          toolSuccess("get_weather", { tempC: 22 }, "")
+        )
+      );
+
+      const spans = toolSpans();
+      expect(spans).toHaveLength(2);
+      expect(spans.map((span) => span.attributes["gen_ai.tool.name"])).toEqual([
+        "get_population",
+        "get_weather",
+      ]);
+      for (const span of spans) {
+        expect(String(span.attributes["gen_ai.tool.call.arguments"])).toContain(
+          "Kyoto"
+        );
+      }
+    });
+
+    it("does not pair a response without an id with a call that has one", async () => {
+      mockSession.prompt = vi
+        .fn()
+        .mockResolvedValueOnce([
+          toolCallChunk(toolCall("get_weather", { city: "Kobe" }, "call-1")),
+        ])
+        .mockResolvedValueOnce("Windy in Kobe.");
+
+      const session = await LanguageModel.create({ tools: [WEATHER_TOOL] });
+      await session.prompt("weather in Kobe?");
+      await session.prompt(
+        toolResponseTurn(toolSuccess("get_weather", { tempC: 19 }, ""))
+      );
+
+      const [toolSpan] = toolSpans();
+      expect(toolSpan?.attributes["gen_ai.tool.call.id"]).toBeUndefined();
+      expect(
+        toolSpan?.attributes["gen_ai.tool.call.arguments"]
+      ).toBeUndefined();
     });
 
     it("does not let an unplaceable response consume another call", async () => {
@@ -1018,9 +1100,6 @@ describe("PromptApiInstrumentation", () => {
       expect(
         String(byName("get_weather")?.attributes["gen_ai.tool.call.arguments"])
       ).toContain("Naha");
-      expect(byName("get_weather")?.attributes["web_ai.tool.call_index"]).toBe(
-        1
-      );
     });
   });
 });

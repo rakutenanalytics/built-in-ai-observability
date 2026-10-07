@@ -15,7 +15,7 @@ import {
   DEFAULT_TOOL_PROMPT,
   TOOL_EXAMPLE_PROMPTS,
   TOOL_SYSTEM_PROMPT,
-  tools,
+  toolDeclarations,
   toolsByName,
   toolUseSupported,
   withoutNulls,
@@ -217,7 +217,7 @@ if ("LanguageModel" in globalThis) {
           { type: "tool-call" },
         ],
         initialPrompts: [{ content: TOOL_SYSTEM_PROMPT, role: "system" }],
-        tools,
+        tools: toolDeclarations,
       });
     }
     return toolSession;
@@ -229,7 +229,7 @@ if ("LanguageModel" in globalThis) {
     const tool = toolsByName.get(call.name);
     if (!tool) {
       return new LanguageModelToolError({
-        callID: call.callID,
+        callId: call.callId,
         errorMessage: `There is no tool named ${call.name}.`,
         name: call.name,
       });
@@ -238,13 +238,13 @@ if ("LanguageModel" in globalThis) {
     try {
       const result = await tool.execute(call.arguments ?? {});
       return new LanguageModelToolSuccess({
-        callID: call.callID,
+        callId: call.callId,
         name: call.name,
         result: [{ type: "object", value: withoutNulls(result) }],
       });
     } catch (err) {
       return new LanguageModelToolError({
-        callID: call.callID,
+        callId: call.callId,
         errorMessage: err instanceof Error ? err.message : String(err),
         name: call.name,
       });
