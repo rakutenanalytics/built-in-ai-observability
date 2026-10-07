@@ -152,7 +152,7 @@ Image and audio parts are encoded twice because the two readers want different s
 { "type": "redacted", "modality": "audio" }
 ```
 
-`mlflow.spanInputs` is written only when `includeMlflowPreview` and `captureMultimodalPreview` are both on. It uses an OpenAI-shaped content part with an inline preview. MLflow and the DevTools panel turn that into a thumbnail or audio player:
+`mlflow.spanInputs` carries the media only when `includeMlflowPreview` and `captureMultimodalPreview` are both on, and only for a prompt with media and no tool traffic. A prompt mixing the two is left to the GenAI attributes, which keep the tool parts. It uses an OpenAI-shaped content part with an inline preview. MLflow and the DevTools panel turn that into a thumbnail or audio player:
 
 ```json
 { "type": "input_audio", "input_audio": { "data": "UklGR…", "format": "wav" } }
@@ -181,6 +181,8 @@ Turns and tool runs are siblings, not nested. They run one after another. A turn
 An `execute_tool` span is paired with the call it answers by `callId`, which it carries as `gen_ai.tool.call.id`, the same id as the `tool_call` part on the turn that asked. Chrome currently sends an empty `callId`, which falls back to a generated id (see [Working around a moving API](#working-around-a-moving-api)). A response that matches no pending call still gets a span, but without the call's arguments, and it starts at the moment the response arrived.
 
 The root span exists because backends summarize a trace from its root, and the answer arrives on the last turn. Without a root, the first turn's output (a tool call) would stand in for the answer. The root carries the user's question as input, the final text as output, and `web_ai.exchange.turn_count` / `web_ai.exchange.tool_call_count`. If the page never returns tool results, the exchange closes on the next question or on `destroy()` and is marked `web_ai.exchange.abandoned`.
+
+With `includeMlflowPreview`, the spans that start a trace (`invoke_agent`, `web_ai.create_session`, and `generate_content` in a session without tools) also get a text-only `mlflow.spanInputs` / `mlflow.spanOutputs`. MLflow renders the GenAI messages of every span, tool traffic included, but its trace and session lists show a root's `gen_ai.*` attribute as a raw JSON string. Turns inside an exchange get no preview, apart from media (see [Multimodal content](#multimodal-content)).
 
 The session spans more than one exchange. Every span carries `gen_ai.conversation.id` (mirrored to `session.id` and `web_ai.session.id`). Clones inherit the conversation and get a fresh `web_ai.session.id` plus `web_ai.session.parent_id`.
 

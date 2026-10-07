@@ -13,6 +13,7 @@ import {
   OPERATION_GENERATE_CONTENT,
   OPERATION_INVOKE_AGENT,
   PROMPT_API_NAME,
+  promptHasMediaPreview,
   promptNeedsAsyncMlflowPreview,
   readContextUsage,
   type SessionTelemetryMeta,
@@ -264,12 +265,10 @@ export interface TurnRequest {
   traffic: ToolTraffic;
 }
 
-function mlflowPreviewOptions(
-  config: InstrumentationConfig
-): { captureMultimodalPreview: true; maxPreviewBytes?: number } | undefined {
-  if (!config.captureMultimodalPreview) {
-    return;
-  }
+function mlflowPreviewOptions(config: InstrumentationConfig): {
+  captureMultimodalPreview: true;
+  maxPreviewBytes?: number;
+} {
   return {
     captureMultimodalPreview: true,
     maxPreviewBytes: config.multimodalPreviewMaxBytes,
@@ -280,18 +279,32 @@ function mlflowPreviewOptions(
  * Media previews are bounded by multimodalPreviewMaxBytes, not by the text
  * attribute cap — applying the latter would strip the base64 back out.
  */
-function mlflowPreviewMaxLength(config: InstrumentationConfig): number {
-  if (!config.captureMultimodalPreview) {
-    return config.maxAttributeLength;
-  }
+function mlflowMediaPreviewMaxLength(config: InstrumentationConfig): number {
   return (
     config.maxMlflowMediaPreviewLength ?? DEFAULT_MLFLOW_MEDIA_PREVIEW_LENGTH
   );
 }
 
+/** Media the GenAI attributes redact, which only an MLflow preview can show. */
+function wantsMediaPreview(
+  prompt: LanguageModelPrompt,
+  config: InstrumentationConfig
+): boolean {
+  return Boolean(
+    config.includeMlflowPreview &&
+      config.captureMultimodalPreview &&
+      promptHasMediaPreview(prompt)
+  );
+}
+
+/**
+ * `root` marks a span that starts a trace, the only place a text preview is
+ * written: MLflow fills its trace and session lists from it.
+ */
 function captureInputAttributes(
   attributes: Attributes,
-  { input, config }: TurnRequest
+  { input, config }: TurnRequest,
+  root: boolean
 ): void {
   const prompt = input as LanguageModelPrompt;
   const inputMessages = encodeInputMessages(prompt);
@@ -302,22 +315,37 @@ function captureInputAttributes(
   if (!config.includeMlflowPreview) {
     return;
   }
-  if (
-    config.captureMultimodalPreview &&
-    promptNeedsAsyncMlflowPreview(prompt)
-  ) {
+  if (wantsMediaPreview(prompt, config)) {
+    // WebM audio is set later, by enrichMlflowInputPreview.
+    if (!promptNeedsAsyncMlflowPreview(prompt)) {
+      setPreview(
+        attributes,
+        MLFLOW_INPUTS,
+        mlflowChatPreviewFromPrompt(
+          prompt,
+          mlflowMediaPreviewMaxLength(config),
+          mlflowPreviewOptions(config)
+        )
+      );
+    }
     return;
   }
-  const previewOptions = mlflowPreviewOptions(config);
-  const preview = config.captureMultimodalPreview
-    ? mlflowChatPreviewFromPrompt(
-        prompt,
-        mlflowPreviewMaxLength(config),
-        previewOptions
-      )
-    : mlflowChatPreview(inputMessages, config.maxAttributeLength);
+  if (root) {
+    setPreview(
+      attributes,
+      MLFLOW_INPUTS,
+      mlflowChatPreview(inputMessages, config.maxAttributeLength)
+    );
+  }
+}
+
+function setPreview(
+  attributes: Attributes,
+  key: string,
+  preview: string | undefined
+): void {
   if (preview) {
-    attributes[MLFLOW_INPUTS] = preview;
+    attributes[key] = preview;
   }
 }
 
@@ -327,18 +355,17 @@ export async function enrichMlflowInputPreview(
   input: unknown,
   config: InstrumentationConfig
 ): Promise<void> {
+  const prompt = input as LanguageModelPrompt;
   if (
     !(
-      config.includeMlflowPreview &&
-      config.captureMultimodalPreview &&
-      promptNeedsAsyncMlflowPreview(input as LanguageModelPrompt)
+      wantsMediaPreview(prompt, config) && promptNeedsAsyncMlflowPreview(prompt)
     )
   ) {
     return;
   }
   const preview = await mlflowChatPreviewFromPromptAsync(
-    input as LanguageModelPrompt,
-    mlflowPreviewMaxLength(config),
+    prompt,
+    mlflowMediaPreviewMaxLength(config),
     mlflowPreviewOptions(config)
   );
   if (preview) {
@@ -373,7 +400,8 @@ export function requestAttributes(request: TurnRequest): Attributes {
   }
 
   if (config.captureInput) {
-    captureInputAttributes(attributes, request);
+    // A turn inside an exchange is not where a trace starts.
+    captureInputAttributes(attributes, request, !state.exchange);
   }
 
   return attributes;
@@ -405,19 +433,20 @@ function captureOutputAttributes(
   attributes: Attributes,
   output: string | AssistantTurn,
   finishReason: string,
-  config: InstrumentationConfig
+  config: InstrumentationConfig,
+  root: boolean
 ): void {
   const outputMessages = encodeOutputMessages(output, finishReason);
   attributes[GEN_AI.OUTPUT_MESSAGES] = truncateAttribute(
     JSON.stringify(outputMessages),
     config.maxAttributeLength
   );
-  if (!config.includeMlflowPreview) {
-    return;
-  }
-  const preview = mlflowChatPreview(outputMessages, config.maxAttributeLength);
-  if (preview) {
-    attributes[MLFLOW_OUTPUTS] = preview;
+  if (config.includeMlflowPreview && root) {
+    setPreview(
+      attributes,
+      MLFLOW_OUTPUTS,
+      mlflowChatPreview(outputMessages, config.maxAttributeLength)
+    );
   }
 }
 
@@ -445,7 +474,13 @@ export function resultAttributes(result: TurnResult): Attributes {
 
   Object.assign(attributes, toolCallAttributes(output));
   if (config.captureOutput) {
-    captureOutputAttributes(attributes, output, finishReason, config);
+    captureOutputAttributes(
+      attributes,
+      output,
+      finishReason,
+      config,
+      !state.exchange
+    );
   }
 
   return attributes;
@@ -470,14 +505,18 @@ export function exchangeAttributes(request: ExchangeRequest): Attributes {
   };
 
   if (config.captureInput) {
-    captureInputAttributes(attributes, {
-      config,
-      input,
-      providerName,
-      state,
-      streaming: false,
-      traffic: { calls: [], responses: [] },
-    });
+    captureInputAttributes(
+      attributes,
+      {
+        config,
+        input,
+        providerName,
+        state,
+        streaming: false,
+        traffic: { calls: [], responses: [] },
+      },
+      true
+    );
   }
 
   return attributes;
@@ -512,7 +551,7 @@ export function exchangeResultAttributes(result: ExchangeResult): Attributes {
   // it: a trace is summarised from its root.
   attributes[GEN_AI.FINISH_REASONS] = [FINISH_STOP];
   if (config.captureOutput) {
-    captureOutputAttributes(attributes, output, FINISH_STOP, config);
+    captureOutputAttributes(attributes, output, FINISH_STOP, config, true);
   }
 
   return attributes;

@@ -77,8 +77,8 @@ if (modeInfo) {
 if (USE_SDK) {
   const observability = new BuiltInAIObservability({
     captureInput: true,
-    // MLflow builds its list previews and chat view from these; other backends
-    // read the GenAI attributes and do not need them.
+    // MLflow fills its trace lists and media previews from these; other
+    // backends read the GenAI attributes and do not need them.
     captureMultimodalPreview: Boolean(experimentId),
     captureOutput: true,
     includeMlflowPreview: Boolean(experimentId),

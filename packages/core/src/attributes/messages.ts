@@ -1,4 +1,3 @@
-import { TOOL_TYPE_FUNCTION } from "../semantic-conventions/attributes.js";
 import { truncateAttribute } from "./helpers.js";
 import {
   audioFormatFromMime,
@@ -195,13 +194,6 @@ export function encodeSystemInstructions(
   return parts.length > 0 ? parts : undefined;
 }
 
-interface OpenAiToolCall {
-  /** OpenAI carries arguments as a JSON string, not as an object. */
-  function: { name: string; arguments?: string };
-  id?: string;
-  type: string;
-}
-
 interface OpenAiTextPart {
   text: string;
   type: "text";
@@ -220,124 +212,36 @@ interface OpenAiAudioPart {
 type OpenAiContentPart = OpenAiAudioPart | OpenAiImagePart | OpenAiTextPart;
 
 interface OpenAiMessage {
-  content: OpenAiContentPart[] | string | null;
+  content: OpenAiContentPart[] | string;
   role: string;
-  tool_call_id?: string;
-  tool_calls?: OpenAiToolCall[];
 }
 
-function safeJson(value: unknown): string | undefined {
-  try {
-    return JSON.stringify(value);
-  } catch {
-    // Message parts are not always JSON-serializable.
+function previewText(part: EncodedPart): string[] {
+  if (part.type === "text") {
+    return [part.content];
   }
-}
-
-function openAiToolCall(part: ToolCallPart): OpenAiToolCall {
-  const call: OpenAiToolCall = {
-    function: { arguments: safeJson(part.arguments ?? {}), name: part.name },
-    type: TOOL_TYPE_FUNCTION,
-  };
-  if (part.id) {
-    call.id = part.id;
+  if (part.type === "redacted") {
+    return [`[${part.modality}]`];
   }
-  return call;
+  return [];
 }
 
 /**
- * The Prompt API wraps a result as `[{ type, value }]`. A lone part is shown as
- * its payload, so MLflow renders the object the tool returned rather than the
- * envelope around it: as JSON it can pretty-print, or as the text itself.
- */
-function toolResultContent(response: unknown): string | undefined {
-  if (Array.isArray(response) && response.length === 1) {
-    const [entry] = response;
-    if (entry && typeof entry === "object" && "value" in entry) {
-      const { type, value } = entry as { type?: unknown; value: unknown };
-      return type === "text" && typeof value === "string"
-        ? value
-        : safeJson(value);
-    }
-  }
-  return safeJson(response);
-}
-
-/** A result is its own message here, whatever role the Prompt API used. */
-function openAiToolMessage(part: ToolCallResponsePart): OpenAiMessage {
-  const message: OpenAiMessage = {
-    content:
-      part.error === undefined
-        ? (toolResultContent(part.response) ?? null)
-        : part.error,
-    role: "tool",
-  };
-  if (part.id) {
-    message.tool_call_id = part.id;
-  }
-  return message;
-}
-
-interface ShapedParts {
-  text: string[];
-  toolCalls: OpenAiToolCall[];
-  /** Results, which stand on their own rather than joining the message. */
-  toolMessages: OpenAiMessage[];
-}
-
-function shapeParts(parts: EncodedPart[]): ShapedParts {
-  const shaped: ShapedParts = { text: [], toolCalls: [], toolMessages: [] };
-  for (const part of parts) {
-    if (part.type === "text") {
-      shaped.text.push(part.content);
-    } else if (part.type === "tool_call") {
-      shaped.toolCalls.push(openAiToolCall(part));
-    } else if (part.type === "tool_call_response") {
-      shaped.toolMessages.push(openAiToolMessage(part));
-    } else {
-      // Enough to show the turn carried an image or audio, never the value.
-      shaped.text.push(`[${part.modality}]`);
-    }
-  }
-  return shaped;
-}
-
-function openAiMessages(message: {
-  role: string;
-  parts: EncodedPart[];
-}): OpenAiMessage[] {
-  const { text, toolCalls, toolMessages } = shapeParts(message.parts);
-  if (text.length === 0 && toolCalls.length === 0) {
-    return toolMessages;
-  }
-  const entry: OpenAiMessage = {
-    content: text.join("\n") || null,
-    role: message.role,
-  };
-  if (toolCalls.length > 0) {
-    entry.tool_calls = toolCalls;
-  }
-  return [...toolMessages, entry];
-}
-
-/**
- * Re-shapes GenAI messages as OpenAI chat messages for MLflow.
+ * A text-only chat preview of GenAI messages, for the spans that start a trace.
  *
- * MLflow reads mlflow.spanInputs/Outputs both for the trace-table preview
- * columns and for a span's "Pretty" view. Left unset it derives them from the
- * GenAI attributes and then renders the derived copy alongside the original, so
- * every message appears twice; setting them here is what keeps a turn rendering
- * once. Tool calls and results have to come across too, or the turns that carry
- * nothing but tool traffic preview as blank.
+ * MLflow renders `gen_ai.*` messages, tool traffic included, in a span's own
+ * view. Its trace and session lists are the exception: they show the root
+ * span's attribute as a raw string unless mlflow.spanInputs/Outputs is set.
+ * Tool parts are left out, since a root carries the question and the answer.
  */
 export function mlflowChatPreview(
   messages: Array<{ role: string; parts: EncodedPart[] }>,
   maxLength: number
 ): string | undefined {
-  const chat = messages.flatMap(openAiMessages);
-  if (chat.length === 0) {
-    return;
-  }
+  const chat = messages.flatMap(({ parts, role }) => {
+    const content = parts.flatMap(previewText).join("\n");
+    return content ? [{ content, role }] : [];
+  });
   return fitMlflowPreview(chat, maxLength);
 }
 
@@ -365,13 +269,10 @@ function openAiContentPartFromPreview(
 function openAiContentPartFromRaw(
   part: MessagePart,
   options?: MultimodalPreviewOptions & { captureMultimodalPreview?: boolean }
-): OpenAiContentPart | undefined {
+): OpenAiContentPart {
   const text = textPartFrom(part);
   if (text) {
     return { text: text.content, type: "text" };
-  }
-  if (part.type === "tool-call" || part.type === "tool-response") {
-    return;
   }
   if (options?.captureMultimodalPreview) {
     const preview = extractMediaPreview(
@@ -380,22 +281,21 @@ function openAiContentPartFromRaw(
       options
     );
     if (preview) {
-      return openAiContentPartFromPreview(part.type, preview);
+      return (
+        openAiContentPartFromPreview(part.type, preview) ?? placeholder(part)
+      );
     }
   }
-  return { text: `[${part.type}]`, type: "text" };
+  return placeholder(part);
 }
 
 async function openAiContentPartFromRawAsync(
   part: MessagePart,
   options?: MultimodalPreviewOptions & { captureMultimodalPreview?: boolean }
-): Promise<OpenAiContentPart | undefined> {
+): Promise<OpenAiContentPart> {
   const text = textPartFrom(part);
   if (text) {
     return { text: text.content, type: "text" };
-  }
-  if (part.type === "tool-call" || part.type === "tool-response") {
-    return;
   }
   if (options?.captureMultimodalPreview) {
     const preview = await extractMediaPreviewAsync(
@@ -404,9 +304,15 @@ async function openAiContentPartFromRawAsync(
       options
     );
     if (preview) {
-      return openAiContentPartFromPreview(part.type, preview);
+      return (
+        openAiContentPartFromPreview(part.type, preview) ?? placeholder(part)
+      );
     }
   }
+  return placeholder(part);
+}
+
+function placeholder(part: MessagePart): OpenAiTextPart {
   return { text: `[${part.type}]`, type: "text" };
 }
 
@@ -422,67 +328,17 @@ function rawContentParts(
   return [];
 }
 
-function contentFromRawParts(
-  rawParts: MessagePart[],
-  options?: MultimodalPreviewOptions & { captureMultimodalPreview?: boolean }
-): OpenAiContentPart[] {
-  return rawParts.flatMap((part) => {
-    if (part.type === "tool-call" || part.type === "tool-response") {
-      return [];
-    }
-    const content = openAiContentPartFromRaw(part, options);
-    return content ? [content] : [];
-  });
-}
-
-async function contentFromRawPartsAsync(
-  rawParts: MessagePart[],
-  options?: MultimodalPreviewOptions & { captureMultimodalPreview?: boolean }
-): Promise<OpenAiContentPart[]> {
-  const parts = await Promise.all(
-    rawParts.map((part) => {
-      if (part.type === "tool-call" || part.type === "tool-response") {
-        return Promise.resolve(undefined);
-      }
-      return openAiContentPartFromRawAsync(part, options);
-    })
-  );
-  return parts.filter((part): part is OpenAiContentPart => part !== undefined);
-}
-
 function finalizeOpenAiContent(
   parts: OpenAiContentPart[]
-): OpenAiContentPart[] | string | null {
+): OpenAiContentPart[] | string | undefined {
   if (parts.length === 0) {
-    return null;
+    return;
   }
   const hasMedia = parts.some((part) => part.type !== "text");
   if (hasMedia) {
     return parts;
   }
-  const textParts = parts as OpenAiTextPart[];
-  if (textParts.length === 1) {
-    return textParts[0]?.text ?? null;
-  }
-  return textParts.map((part) => part.text).join("\n");
-}
-
-function assembleOpenAiMessages(
-  encoded: EncodedMessage,
-  contentParts: OpenAiContentPart[]
-): OpenAiMessage[] {
-  const { toolCalls, toolMessages } = shapeParts(encoded.parts);
-  const content = finalizeOpenAiContent(contentParts);
-
-  if (content === null && toolCalls.length === 0) {
-    return toolMessages;
-  }
-
-  const entry: OpenAiMessage = { content, role: encoded.role };
-  if (toolCalls.length > 0) {
-    entry.tool_calls = toolCalls;
-  }
-  return [...toolMessages, entry];
+  return (parts as OpenAiTextPart[]).map((part) => part.text).join("\n");
 }
 
 function promptMessages(
@@ -495,6 +351,32 @@ function promptMessages(
     return input;
   }
   return [input];
+}
+
+function promptParts(
+  input: string | PromptMessage | PromptMessage[]
+): MessagePart[] {
+  return promptMessages(input).flatMap(({ content }) =>
+    Array.isArray(content) ? content : []
+  );
+}
+
+const MEDIA_PART_TYPES = new Set(["audio", "image"]);
+const TOOL_PART_TYPES = new Set(["tool-call", "tool-response"]);
+
+/**
+ * True when a prompt carries an image or audio part to preview inline. A
+ * prompt that also carries tool traffic is left to the GenAI attributes, which
+ * MLflow renders with the tool parts the preview would leave out.
+ */
+export function promptHasMediaPreview(
+  input: string | PromptMessage | PromptMessage[]
+): boolean {
+  const parts = promptParts(input);
+  return (
+    parts.some((part) => MEDIA_PART_TYPES.has(part.type)) &&
+    !parts.some((part) => TOOL_PART_TYPES.has(part.type))
+  );
 }
 
 function stripMediaBinary(messages: OpenAiMessage[]): OpenAiMessage[] {
@@ -557,15 +439,17 @@ function partHasWebmAudio(part: MessagePart): boolean {
 export function promptNeedsAsyncMlflowPreview(
   input: string | PromptMessage | PromptMessage[]
 ): boolean {
-  for (const { content } of promptMessages(input)) {
-    if (!Array.isArray(content)) {
-      continue;
-    }
-    if (content.some(partHasWebmAudio)) {
-      return true;
-    }
-  }
-  return false;
+  return promptParts(input).some(partHasWebmAudio);
+}
+
+function previewMessage(
+  message: PromptMessage,
+  parts: OpenAiContentPart[]
+): OpenAiMessage[] {
+  const content = finalizeOpenAiContent(parts);
+  return content === undefined
+    ? []
+    : [{ content, role: message.role ?? "user" }];
 }
 
 /**
@@ -577,13 +461,12 @@ export function mlflowChatPreviewFromPrompt(
   maxLength: number,
   options?: MultimodalPreviewOptions & { captureMultimodalPreview?: boolean }
 ): string | undefined {
-  const encoded = encodeInputMessages(input);
-  const rawMessages = promptMessages(input);
-
-  const chat = encoded.flatMap((message, index) =>
-    assembleOpenAiMessages(
+  const chat = promptMessages(input).flatMap((message) =>
+    previewMessage(
       message,
-      contentFromRawParts(rawContentParts(rawMessages[index]?.content), options)
+      rawContentParts(message.content).map((part) =>
+        openAiContentPartFromRaw(part, options)
+      )
     )
   );
   return fitMlflowPreview(chat, maxLength);
@@ -594,19 +477,17 @@ export async function mlflowChatPreviewFromPromptAsync(
   maxLength: number,
   options?: MultimodalPreviewOptions & { captureMultimodalPreview?: boolean }
 ): Promise<string | undefined> {
-  const encoded = encodeInputMessages(input);
-  const rawMessages = promptMessages(input);
-  const messageGroups = await Promise.all(
-    encoded.map(async (message, index) =>
-      assembleOpenAiMessages(
+  const groups = await Promise.all(
+    promptMessages(input).map(async (message) =>
+      previewMessage(
         message,
-        await contentFromRawPartsAsync(
-          rawContentParts(rawMessages[index]?.content),
-          options
+        await Promise.all(
+          rawContentParts(message.content).map((part) =>
+            openAiContentPartFromRawAsync(part, options)
+          )
         )
       )
     )
   );
-
-  return fitMlflowPreview(messageGroups.flat(), maxLength);
+  return fitMlflowPreview(groups.flat(), maxLength);
 }

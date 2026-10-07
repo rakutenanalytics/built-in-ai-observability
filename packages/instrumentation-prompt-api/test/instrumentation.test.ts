@@ -541,11 +541,10 @@ describe("PromptApiInstrumentation", () => {
     });
 
     /**
-     * A turn that only calls a tool used to leave the MLflow preview unset, and
-     * MLflow then derives its own from the GenAI attributes and renders both,
-     * showing every message twice.
+     * MLflow renders the GenAI attributes of a turn on its own, tool traffic
+     * included. Only its trace list, read from the root, needs the preview.
      */
-    it("previews tool traffic rather than leaving it to MLflow", async () => {
+    it("previews the exchange but leaves its turns to the GenAI attributes", async () => {
       instrumentation.disable();
       exporter.reset();
       setup({ includeMlflowPreview: true });
@@ -563,18 +562,39 @@ describe("PromptApiInstrumentation", () => {
         toolResponseTurn(toolSuccess("get_weather", { tempC: 24 }))
       );
 
-      const [first, second] = turnSpans();
-      const asked = JSON.parse(String(first?.attributes["mlflow.spanOutputs"]));
-      expect(asked.messages[0].tool_calls[0].function).toEqual({
-        arguments: '{"city":"Kyoto"}',
-        name: "get_weather",
+      const root = spanNamed("invoke_agent");
+      expect(JSON.parse(String(root?.attributes["mlflow.spanInputs"]))).toEqual(
+        { messages: [{ content: "weather in Kyoto?", role: "user" }] }
+      );
+      expect(
+        JSON.parse(String(root?.attributes["mlflow.spanOutputs"]))
+      ).toEqual({
+        messages: [{ content: "It is raining in Kyoto.", role: "assistant" }],
       });
 
-      const answered = JSON.parse(
-        String(second?.attributes["mlflow.spanInputs"])
+      for (const turn of turnSpans()) {
+        expect(turn.attributes["mlflow.spanInputs"]).toBeUndefined();
+        expect(turn.attributes["mlflow.spanOutputs"]).toBeUndefined();
+        expect(turn.attributes["gen_ai.input.messages"]).toBeDefined();
+      }
+    });
+
+    it("previews a turn that starts its own trace", async () => {
+      instrumentation.disable();
+      exporter.reset();
+      setup({ includeMlflowPreview: true });
+      mockSession.prompt = vi.fn().mockResolvedValue("Hello.");
+
+      const session = await LanguageModel.create();
+      await session.prompt("hi");
+
+      const [turn] = turnSpans();
+      expect(JSON.parse(String(turn?.attributes["mlflow.spanInputs"]))).toEqual(
+        { messages: [{ content: "hi", role: "user" }] }
       );
-      expect(answered.messages[0].role).toBe("tool");
-      expect(answered.messages[0].content).toContain("24");
+      expect(
+        JSON.parse(String(turn?.attributes["mlflow.spanOutputs"]))
+      ).toEqual({ messages: [{ content: "Hello.", role: "assistant" }] });
     });
 
     it("times the tool run and keeps the exchange in one trace", async () => {

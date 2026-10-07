@@ -11,6 +11,7 @@ import {
   fitMlflowPreview,
   mlflowChatPreview,
   mlflowChatPreviewFromPrompt,
+  promptHasMediaPreview,
   promptNeedsAsyncMlflowPreview,
 } from "../src/attributes/messages.js";
 
@@ -108,114 +109,31 @@ describe("mlflowChatPreview", () => {
     ).toEqual({ messages: [{ content: "a\nb", role: "user" }] });
   });
 
-  it("carries a tool call over as an OpenAI tool_calls entry", () => {
+  it("leaves tool parts to the GenAI attributes", () => {
     expect(
       preview([
         {
           parts: [
+            { content: "Checking.", type: "text" },
             {
               arguments: { city: "Kyoto" },
-              id: "call-1",
               name: "get_weather",
               type: "tool_call",
             },
           ],
           role: "assistant",
         },
-      ])
-    ).toEqual({
-      messages: [
-        {
-          content: null,
-          role: "assistant",
-          tool_calls: [
-            {
-              function: {
-                arguments: '{"city":"Kyoto"}',
-                name: "get_weather",
-              },
-              id: "call-1",
-              type: "function",
-            },
-          ],
-        },
-      ],
-    });
-  });
-
-  it("lifts a tool result into its own tool message", () => {
-    expect(
-      preview([
         {
           parts: [
-            {
-              id: "call-1",
-              name: "get_weather",
-              response: { tempC: 24 },
-              type: "tool_call_response",
-            },
+            { name: "get_weather", response: [], type: "tool_call_response" },
           ],
           role: "user",
         },
       ])
-    ).toEqual({
-      messages: [
-        { content: '{"tempC":24}', role: "tool", tool_call_id: "call-1" },
-      ],
-    });
+    ).toEqual({ messages: [{ content: "Checking.", role: "assistant" }] });
   });
 
-  it("previews a tool error in place of its result", () => {
-    expect(
-      preview([
-        {
-          parts: [
-            { error: "boom", name: "get_weather", type: "tool_call_response" },
-          ],
-          role: "user",
-        },
-      ])
-    ).toEqual({ messages: [{ content: "boom", role: "tool" }] });
-  });
-
-  it("previews a Prompt API tool result as its payload, not its envelope", () => {
-    const toolMessage = (response: unknown) =>
-      preview([
-        {
-          parts: [{ name: "search", response, type: "tool_call_response" }],
-          role: "user",
-        },
-      ]);
-
-    expect(
-      toolMessage([{ type: "object", value: { query: "dates", total: 3 } }])
-    ).toEqual({
-      messages: [{ content: '{"query":"dates","total":3}', role: "tool" }],
-    });
-    expect(toolMessage([{ type: "text", value: "Sunny, 24C" }])).toEqual({
-      messages: [{ content: "Sunny, 24C", role: "tool" }],
-    });
-    // Several parts have no single payload to stand for them.
-    expect(
-      toolMessage([
-        { type: "text", value: "a" },
-        { type: "text", value: "b" },
-      ])
-    ).toEqual({
-      messages: [
-        {
-          content: '[{"type":"text","value":"a"},{"type":"text","value":"b"}]',
-          role: "tool",
-        },
-      ],
-    });
-  });
-
-  /**
-   * A turn with nothing renderable would otherwise leave the attribute unset,
-   * and MLflow then derives its own copy and shows every message twice.
-   */
-  it("stands in for a redacted modality so the preview is never empty", () => {
+  it("stands in for a redacted modality", () => {
     expect(
       preview([
         { parts: [{ modality: "image", type: "redacted" }], role: "user" },
@@ -333,6 +251,22 @@ describe("mlflowChatPreviewFromPrompt", () => {
     const parsed = JSON.parse(json ?? "null");
     expect(parsed.messages[0].content[1].input_audio.data).toBe("");
     expect(JSON.parse(json ?? "null")).toEqual(parsed);
+  });
+
+  it("previews only prompts with media and no tool traffic", () => {
+    const image = { type: "image", value: "bytes" };
+    expect(promptHasMediaPreview("hi")).toBe(false);
+    expect(promptHasMediaPreview([{ content: [image], role: "user" }])).toBe(
+      true
+    );
+    expect(
+      promptHasMediaPreview([
+        {
+          content: [image, { type: "tool-response", value: {} }],
+          role: "user",
+        },
+      ])
+    ).toBe(false);
   });
 
   it("keeps gen_ai attributes redacted while exporting previews separately", () => {
