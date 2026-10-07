@@ -245,11 +245,31 @@ function openAiToolCall(part: ToolCallPart): OpenAiToolCall {
   return call;
 }
 
+/**
+ * The Prompt API wraps a result as `[{ type, value }]`. A lone part is shown as
+ * its payload, so MLflow renders the object the tool returned rather than the
+ * envelope around it: as JSON it can pretty-print, or as the text itself.
+ */
+function toolResultContent(response: unknown): string | undefined {
+  if (Array.isArray(response) && response.length === 1) {
+    const [entry] = response;
+    if (entry && typeof entry === "object" && "value" in entry) {
+      const { type, value } = entry as { type?: unknown; value: unknown };
+      return type === "text" && typeof value === "string"
+        ? value
+        : safeJson(value);
+    }
+  }
+  return safeJson(response);
+}
+
 /** A result is its own message here, whatever role the Prompt API used. */
 function openAiToolMessage(part: ToolCallResponsePart): OpenAiMessage {
   const message: OpenAiMessage = {
     content:
-      safeJson(part.error === undefined ? part.response : part.error) ?? null,
+      part.error === undefined
+        ? (toolResultContent(part.response) ?? null)
+        : part.error,
     role: "tool",
   };
   if (part.id) {

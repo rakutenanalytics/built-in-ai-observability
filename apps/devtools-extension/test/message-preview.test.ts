@@ -32,8 +32,26 @@ describe("spanInputs", () => {
         },
       ]),
     });
-    expect(payload?.messages[0]?.title).toBe("Tool");
-    expect(payload?.messages[0]?.text).toContain("iso");
+    expect(payload?.messages[0]).toEqual({
+      fields: { iso: "2026-09-10T02:25:18.662Z" },
+      role: "tool",
+      title: "Tool",
+    });
+  });
+
+  it("unwraps a tool result fed back on the next turn like on its tool span", () => {
+    const result = JSON.stringify([
+      { type: "object", value: { query: "date formatting", total: 3 } },
+    ]);
+    const nextTurn = spanInputs({
+      "mlflow.spanInputs": JSON.stringify({
+        messages: [{ content: result, role: "tool" }],
+      }),
+    });
+    const toolSpan = spanOutputs({ [GEN_AI.TOOL_CALL_RESULT]: result });
+
+    expect(nextTurn?.messages[0]?.fields).toEqual(toolSpan?.fields);
+    expect(nextTurn?.messages[0]?.text).toBeUndefined();
   });
 
   it("falls back to execute_tool arguments", () => {

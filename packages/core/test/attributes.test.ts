@@ -175,7 +175,40 @@ describe("mlflowChatPreview", () => {
           role: "user",
         },
       ])
-    ).toEqual({ messages: [{ content: '"boom"', role: "tool" }] });
+    ).toEqual({ messages: [{ content: "boom", role: "tool" }] });
+  });
+
+  it("previews a Prompt API tool result as its payload, not its envelope", () => {
+    const toolMessage = (response: unknown) =>
+      preview([
+        {
+          parts: [{ name: "search", response, type: "tool_call_response" }],
+          role: "user",
+        },
+      ]);
+
+    expect(
+      toolMessage([{ type: "object", value: { query: "dates", total: 3 } }])
+    ).toEqual({
+      messages: [{ content: '{"query":"dates","total":3}', role: "tool" }],
+    });
+    expect(toolMessage([{ type: "text", value: "Sunny, 24C" }])).toEqual({
+      messages: [{ content: "Sunny, 24C", role: "tool" }],
+    });
+    // Several parts have no single payload to stand for them.
+    expect(
+      toolMessage([
+        { type: "text", value: "a" },
+        { type: "text", value: "b" },
+      ])
+    ).toEqual({
+      messages: [
+        {
+          content: '[{"type":"text","value":"a"},{"type":"text","value":"b"}]',
+          role: "tool",
+        },
+      ],
+    });
   });
 
   /**

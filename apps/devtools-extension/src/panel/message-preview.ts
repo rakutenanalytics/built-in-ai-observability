@@ -95,6 +95,40 @@ function textFromContent(content: unknown): string | undefined {
   return JSON.stringify(content, null, 2);
 }
 
+/**
+ * Tool results come from the page as a content part, e.g.
+ * `[{ type: "object", value: {...} }]`, per the Prompt API's
+ * `LanguageModelToolSuccess` shape — the same envelope arguments never carry.
+ * Unwrapped, so the actual payload renders instead of vanishing because an
+ * array isn't a plain object.
+ */
+function unwrapToolValue(value: unknown): unknown {
+  if (Array.isArray(value) && value.length === 1) {
+    const [entry] = value;
+    if (
+      entry &&
+      typeof entry === "object" &&
+      !Array.isArray(entry) &&
+      "value" in entry
+    ) {
+      return (entry as { value: unknown }).value;
+    }
+  }
+  return value;
+}
+
+/**
+ * A tool result card, whether it sits on the tool span or on the turn it fed.
+ * Both carry the same envelope and have to render the same way.
+ */
+function toolResultCard(payload: unknown, title: string): PrettyMessage {
+  const unwrapped = unwrapToolValue(payload);
+  const fields = objectFields(unwrapped);
+  return fields
+    ? { fields, role: "tool", title }
+    : { role: "tool", text: textFromContent(unwrapped), title };
+}
+
 function messageArray(parsed: unknown): Record<string, unknown>[] | undefined {
   if (Array.isArray(parsed)) {
     return parsed as Record<string, unknown>[];
@@ -201,17 +235,10 @@ function openAiMessageCard(
   }
 
   if (role === "tool") {
-    const parsedContent =
-      typeof message.content === "string"
-        ? parseJson(message.content)
-        : message.content;
-    const fields = objectFields(parsedContent);
-    return {
-      fields,
-      role,
-      text: fields ? undefined : text,
-      title: "Tool",
-    };
+    const { content } = message;
+    const payload =
+      typeof content === "string" ? (parseJson(content) ?? content) : content;
+    return toolResultCard(payload, "Tool");
   }
 
   if (!(text || media?.length)) {
@@ -235,12 +262,7 @@ function openAiMessages(parsed: unknown): PrettyMessage[] | undefined {
 function toolResponseCard(part: GenAiPart): PrettyMessage {
   const payload =
     part.error === undefined ? (part.response ?? part) : part.error;
-  return {
-    fields: objectFields(payload),
-    role: "tool",
-    text: textFromContent(payload),
-    title: "Tool",
-  };
+  return toolResultCard(payload, "Tool");
 }
 
 function genAiPartCards(part: GenAiPart): {
@@ -321,43 +343,17 @@ function genAiMessages(parsed: unknown): PrettyMessage[] | undefined {
   return cards.length > 0 ? cards : undefined;
 }
 
-/**
- * Tool results come from the page as a content part, e.g.
- * `[{ type: "object", value: {...} }]`, per the Prompt API's
- * `LanguageModelToolSuccess` shape — the same envelope arguments never carry.
- * Unwrapped, so the actual payload renders instead of vanishing because an
- * array isn't a plain object.
- */
-function unwrapToolValue(value: unknown): unknown {
-  if (Array.isArray(value) && value.length === 1) {
-    const [entry] = value;
-    if (
-      entry &&
-      typeof entry === "object" &&
-      !Array.isArray(entry) &&
-      "value" in entry
-    ) {
-      return (entry as { value: unknown }).value;
-    }
-  }
-  return value;
-}
-
 function toolFields(json: string, title: string): IoPayload | undefined {
   const parsed = parseJson(json);
   if (parsed === undefined) {
     return;
   }
-  const unwrapped = unwrapToolValue(parsed);
-  const fields = objectFields(unwrapped);
-  if (fields) {
-    return { fields, json, messages: [] };
+  const card = toolResultCard(parsed, title);
+  if (card.fields) {
+    return { fields: card.fields, json, messages: [] };
   }
   // Not a plain object (an array, string, or number) — still worth showing.
-  return {
-    json,
-    messages: [{ role: "tool", text: textFromContent(unwrapped), title }],
-  };
+  return { json, messages: [card] };
 }
 
 function resolveMessages(
