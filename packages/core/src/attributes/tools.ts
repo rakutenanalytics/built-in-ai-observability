@@ -12,10 +12,7 @@
 /** A tool the model asked for. */
 export interface ToolCallInfo {
   arguments?: unknown;
-  /**
-   * `callId`, which the response repeats. The spec requires it to be non-empty,
-   * but Chrome 157 still sends `""`.
-   */
+  /** `callId`, which the response repeats. */
   id: string;
   name: string;
 }

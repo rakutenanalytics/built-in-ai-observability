@@ -178,7 +178,7 @@ invoke_agent                       "What is the weather and the population of Ky
 
 Turns and tool runs are siblings, not nested. They run one after another. A turn does not wrap the turn before it, and a tool does not wrap the turn that requested it. Nesting would produce children that outlive their parents.
 
-An `execute_tool` span is paired with the call it answers by `callId`, which it carries as `gen_ai.tool.call.id`, the same id as the `tool_call` part on the turn that asked. Chrome currently sends an empty `callId`, which falls back to a generated id (see [Working around a moving API](#working-around-a-moving-api)). A response that matches no pending call still gets a span, but without the call's arguments, and it starts at the moment the response arrived.
+An `execute_tool` span is paired with the call it answers by `callId`, which it carries as `gen_ai.tool.call.id`, the same id as the `tool_call` part on the turn that asked. A response that matches no pending call still gets a span, but without the call's arguments, and it starts at the moment the response arrived.
 
 The root span exists because backends summarize a trace from its root, and the answer arrives on the last turn. Without a root, the first turn's output (a tool call) would stand in for the answer. The root carries the user's question as input, the final text as output, and `web_ai.exchange.turn_count` / `web_ai.exchange.tool_call_count`. If the page never returns tool results, the exchange closes on the next question or on `destroy()` and is marked `web_ai.exchange.abandoned`.
 
@@ -230,7 +230,6 @@ Messages use `protocolVersion: 2`. Only `built-in-ai-obs:*` types are accepted. 
 Tool use is still changing in Chrome. These workarounds should be deleted once behavior stabilizes:
 
 - Tool objects keep fields on the prototype, so `Object.keys()` sees nothing and `JSON.stringify()` yields `{}`. `packages/core/src/attributes/tools.ts` reads each field by name instead.
-- The spec requires a non-empty `callId`, but Chrome 157 still returns `""`, even for several calls in one turn. A call without one is given a generated id (`<session id>-<n>`), and a response without one pairs by tool name and request order, but only with calls that also arrived without an id (`registerToolCalls` and `takePendingCall` in `packages/instrumentation-prompt-api/src/tool-spans.ts`). Once Chrome sends real ids, they are used as is and this path goes unused.
 - Chrome rejects a tool result containing JSON `null` at any depth. The playground strips those in `apps/playground/tools.ts`.
 - An `execute_tool` span is reconstructed from the outside because the tool runs in page code the instrumentation never sees.
 

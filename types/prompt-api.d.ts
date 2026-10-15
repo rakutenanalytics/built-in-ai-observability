@@ -71,9 +71,8 @@ interface LanguageModelToolDeclaration {
 }
 
 /**
- * A tool the model wants run. The spec requires `callId` to be non-empty, and a
- * response answers the call whose `callId` it repeats. Chrome 157 still sends
- * an empty string.
+ * A tool the model wants run. A response answers the call whose `callId` it
+ * repeats.
  */
 interface LanguageModelToolCall {
   readonly arguments: Record<string, unknown>;

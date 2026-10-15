@@ -1009,66 +1009,7 @@ describe("PromptApiInstrumentation", () => {
       ).toBeUndefined();
     });
 
-    it("gives a call Chrome sent without an id one of its own", async () => {
-      mockSession.prompt = vi
-        .fn()
-        .mockResolvedValueOnce([
-          toolCallChunk(toolCall("get_weather", { city: "Hakone" }, "")),
-        ])
-        .mockResolvedValueOnce("It is misty in Hakone.");
-
-      const session = await LanguageModel.create({ tools: [WEATHER_TOOL] });
-      await session.prompt("weather in Hakone?");
-      await session.prompt(
-        toolResponseTurn(toolSuccess("get_weather", { tempC: 14 }, ""))
-      );
-
-      const [turn] = turnSpans();
-      const [toolSpan] = toolSpans();
-      const callId = toolSpan?.attributes["gen_ai.tool.call.id"];
-
-      // Without it nothing joins the turn that asked to the span that answered.
-      expect(callId).toBeTruthy();
-      expect(String(turn?.attributes["gen_ai.output.messages"])).toContain(
-        String(callId)
-      );
-      expect(
-        String(toolSpan?.attributes["gen_ai.tool.call.arguments"])
-      ).toContain("Hakone");
-    });
-
-    it("pairs calls Chrome sent without an id by name", async () => {
-      mockSession.prompt = vi
-        .fn()
-        .mockResolvedValueOnce([
-          toolCallChunk(toolCall("get_weather", { city: "Kyoto" }, "")),
-          toolCallChunk(toolCall("get_population", { city: "Kyoto" }, "")),
-        ])
-        .mockResolvedValueOnce("Kyoto is clear, with 1.4M people.");
-
-      const session = await LanguageModel.create({ tools: [WEATHER_TOOL] });
-      await session.prompt("weather and population of Kyoto?");
-      await session.prompt(
-        toolResponseTurn(
-          toolSuccess("get_population", { people: 1_400_000 }, ""),
-          toolSuccess("get_weather", { tempC: 22 }, "")
-        )
-      );
-
-      const spans = toolSpans();
-      expect(spans).toHaveLength(2);
-      expect(spans.map((span) => span.attributes["gen_ai.tool.name"])).toEqual([
-        "get_population",
-        "get_weather",
-      ]);
-      for (const span of spans) {
-        expect(String(span.attributes["gen_ai.tool.call.arguments"])).toContain(
-          "Kyoto"
-        );
-      }
-    });
-
-    it("does not pair a response without an id with a call that has one", async () => {
+    it("does not pair a response without an id", async () => {
       mockSession.prompt = vi
         .fn()
         .mockResolvedValueOnce([

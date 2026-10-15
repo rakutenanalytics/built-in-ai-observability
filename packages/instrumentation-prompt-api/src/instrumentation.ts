@@ -295,18 +295,8 @@ export function wrapSession(
         const at = spanTimestamp();
         endedAt = at;
         // A turn asking for a tool resolves to content parts, not a string.
-        const assistant = readAssistantTurn(output);
-        // Registered before the attributes are written so the turn's own
-        // tool_call parts carry the ids the tool spans will be labelled with.
-        turn = {
-          text: assistant.text,
-          toolCalls: registerToolCalls(
-            state,
-            assistant.toolCalls,
-            toolParent(spanContext),
-            at
-          ),
-        };
+        turn = readAssistantTurn(output);
+        registerToolCalls(state, turn.toolCalls, toolParent(spanContext), at);
         const after = readContextUsage(session);
         reconcileContextOverflow(span, state, before, after);
         span.setAttributes(
@@ -429,17 +419,8 @@ export function wrapSession(
           ]);
           const at = spanTimestamp();
           endedAt = at;
-          // Registered before the attributes are written so the turn's own
-          // tool_call parts carry the ids the tool spans will be labelled with.
-          turn = {
-            text,
-            toolCalls: registerToolCalls(
-              state,
-              toolCalls,
-              toolParent(spanContext),
-              at
-            ),
-          };
+          turn = { text, toolCalls };
+          registerToolCalls(state, toolCalls, toolParent(spanContext), at);
           finalize(
             turn,
             turn.toolCalls.length > 0 ? FINISH_TOOL_CALL : FINISH_STOP

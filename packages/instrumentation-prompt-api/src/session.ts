@@ -36,8 +36,6 @@ const DEFAULT_MLFLOW_MEDIA_PREVIEW_LENGTH = 1_048_576;
  * it is to remember when the page could first run it and wait for its response.
  */
 export interface PendingToolCall extends ToolCallInfo {
-  /** Set when the browser sent no `callId` and the id was made up here. */
-  generatedId: boolean;
   /** Context of the turn that asked for the call. */
   parent: Context;
   /**
@@ -53,8 +51,6 @@ export interface SessionState extends SessionTelemetryMeta {
   compacted: boolean;
   /** The exchange in flight, if the current question needed tools. */
   exchange?: Exchange;
-  /** Numbers the ids made up for calls that arrive without a `callId`. */
-  generatedCallSeq: number;
   pendingCalls: PendingToolCall[];
   /**
    * Set when the session reports an overflow while no span is in flight, so the
@@ -102,7 +98,6 @@ export function createSessionState(
     ...meta,
     activeSpans: new Set(),
     compacted: false,
-    generatedCallSeq: 0,
     pendingCalls: [],
     pendingOverflow: false,
     tools: new Map(tools.map((tool) => [tool.name, tool])),

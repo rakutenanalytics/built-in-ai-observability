@@ -72,7 +72,6 @@ interface EncodedOutputMessage extends EncodedMessage {
 
 function toolCallPart(call: ToolCallInfo): ToolCallPart {
   const part: ToolCallPart = { name: call.name, type: "tool_call" };
-  // Chrome leaves the id empty, and an empty string reads as a real value.
   if (call.id) {
     part.id = call.id;
   }
