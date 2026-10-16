@@ -78,6 +78,26 @@
       font-size: 0.9rem;
       opacity: 0.85;
     }
+    .export-form {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      align-items: end;
+      margin-bottom: 1rem;
+    }
+    .export-form[hidden],
+    .export-form label[hidden] {
+      display: none;
+    }
+    .export-form label {
+      display: grid;
+      gap: 0.35rem;
+      font-size: 0.9rem;
+    }
+    .export-form .export-url {
+      flex: 1;
+      min-width: 220px;
+    }
     .tool-help {
       padding: 0.75rem;
       font-size: 0.9rem;
@@ -120,6 +140,24 @@
   <body>
     <h1>Built-in AI Observability Playground</h1>
     <p class="mode" id="mode-info">Loading…</p>
+    <form class="export-form" id="export-form">
+      <label>
+        Export traces to
+        <select id="export-destination">
+          <option value="collector">OTLP collector</option>
+          <option value="mlflow">MLflow</option>
+        </select>
+      </label>
+      <label hidden id="export-experiment-field">
+        Experiment ID
+        <input id="export-experiment" size="8" type="text">
+      </label>
+      <label class="export-url">
+        OTLP URL (optional)
+        <input id="export-url" type="url">
+      </label>
+      <button type="submit">Apply &amp; reload</button>
+    </form>
     <p>
       Test the Prompt API with or without the Built-in AI Observability SDK.
       Load the

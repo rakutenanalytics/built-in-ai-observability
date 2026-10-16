@@ -27,19 +27,74 @@ const USE_SDK = params.get("sdk") !== "false";
 const COLLECTOR_OTLP_URL = "http://localhost:4318/v1/traces";
 const MLFLOW_OTLP_URL = "http://localhost:5000/v1/traces";
 
+type Destination = "collector" | "mlflow";
+
+interface ExportSettings {
+  destination: Destination;
+  experimentId: string;
+  /** Empty means the destination's default endpoint. */
+  url: string;
+}
+
+const SETTINGS_KEY = "playground:export-settings";
+const DEFAULT_SETTINGS: ExportSettings = {
+  destination: "collector",
+  experimentId: "0",
+  url: "",
+};
+
+function loadSettings(): ExportSettings {
+  try {
+    const stored = localStorage.getItem(SETTINGS_KEY);
+    return stored
+      ? { ...DEFAULT_SETTINGS, ...JSON.parse(stored) }
+      : DEFAULT_SETTINGS;
+  } catch {
+    return DEFAULT_SETTINGS;
+  }
+}
+
 /**
- * `?experiment=<id>` points the exporter at a local MLflow, which ingests OTLP
- * but needs to be told which experiment to file traces under. `?otlp=<url>`
- * overrides the destination for any other collector.
+ * The export form is the way to choose a destination. `?experiment=<id>` and
+ * `?otlp=<url>` still work as one-off overrides, so existing links keep working.
  */
-const experimentId = params.get("experiment");
+function resolveSettings(): ExportSettings {
+  const stored = loadSettings();
+  // An empty `?experiment=` selects nothing, as before.
+  const experiment = params.get("experiment") || null;
+  const otlp = params.get("otlp");
+  return {
+    destination: experiment === null ? stored.destination : "mlflow",
+    experimentId: experiment ?? stored.experimentId,
+    url: otlp ?? stored.url,
+  };
+}
+
+const settings = resolveSettings();
+const useMlflow = settings.destination === "mlflow";
+
+/**
+ * MLflow ingests OTLP but needs to be told which experiment to file traces
+ * under. Any other collector takes the URL as is.
+ */
 const otlpUrl =
-  params.get("otlp") ?? (experimentId ? MLFLOW_OTLP_URL : COLLECTOR_OTLP_URL);
-const otlpHeaders: Record<string, string> = experimentId
-  ? { "x-mlflow-experiment-id": experimentId }
+  settings.url || (useMlflow ? MLFLOW_OTLP_URL : COLLECTOR_OTLP_URL);
+const otlpHeaders: Record<string, string> = useMlflow
+  ? { "x-mlflow-experiment-id": settings.experimentId }
   : {};
 
 const modeInfo = document.getElementById("mode-info");
+const exportForm = document.getElementById("export-form") as HTMLFormElement;
+const destinationSelect = document.getElementById(
+  "export-destination"
+) as HTMLSelectElement;
+const experimentField = document.getElementById(
+  "export-experiment-field"
+) as HTMLElement;
+const experimentInput = document.getElementById(
+  "export-experiment"
+) as HTMLInputElement;
+const urlInput = document.getElementById("export-url") as HTMLInputElement;
 const output = document.getElementById("output");
 const promptInput = document.getElementById("prompt") as HTMLTextAreaElement;
 const form = document.getElementById("form") as HTMLFormElement;
@@ -69,9 +124,46 @@ type PlaygroundMode = "audio" | "image" | "text";
 if (modeInfo) {
   modeInfo.textContent = USE_SDK
     ? `Mode: Built-in AI Observability SDK, exporting to ${otlpUrl}${
-        experimentId ? ` (MLflow experiment ${experimentId})` : ""
+        useMlflow ? ` (MLflow experiment ${settings.experimentId})` : ""
       }`
     : "Mode: Extension only (no Built-in AI Observability SDK; use DevTools extension)";
+}
+
+function defaultUrl(destination: string): string {
+  return destination === "mlflow" ? MLFLOW_OTLP_URL : COLLECTOR_OTLP_URL;
+}
+
+function syncExportForm(): void {
+  experimentField.hidden = destinationSelect.value !== "mlflow";
+  urlInput.placeholder = defaultUrl(destinationSelect.value);
+}
+
+if (USE_SDK) {
+  destinationSelect.value = settings.destination;
+  experimentInput.value = settings.experimentId;
+  urlInput.value = settings.url;
+  syncExportForm();
+  destinationSelect.addEventListener("change", syncExportForm);
+
+  // The SDK patches LanguageModel once, and sessions keep the exporter they
+  // were created with, so a new destination takes effect on reload.
+  exportForm.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const next: ExportSettings = {
+      destination:
+        destinationSelect.value === "mlflow" ? "mlflow" : "collector",
+      experimentId:
+        experimentInput.value.trim() || DEFAULT_SETTINGS.experimentId,
+      url: urlInput.value.trim(),
+    };
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
+    const url = new URL(location.href);
+    url.searchParams.delete("experiment");
+    url.searchParams.delete("otlp");
+    location.href = url.href;
+  });
+} else {
+  exportForm.hidden = true;
 }
 
 if (USE_SDK) {
@@ -79,9 +171,9 @@ if (USE_SDK) {
     captureInput: true,
     // MLflow fills its trace lists and media previews from these; other
     // backends read the GenAI attributes and do not need them.
-    captureMultimodalPreview: Boolean(experimentId),
+    captureMultimodalPreview: useMlflow,
     captureOutput: true,
-    includeMlflowPreview: Boolean(experimentId),
+    includeMlflowPreview: useMlflow,
     otlpHeaders,
     otlpUrl,
     serviceName: "playground",

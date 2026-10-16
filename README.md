@@ -65,10 +65,11 @@ Tabs cover plain text, image and audio prompts, and tool calling.
 
 - Default: Built-in AI Observability SDK, exporting OTLP to a collector on `localhost:4318`
 - Extension-only: `?sdk=false` (no Built-in AI Observability SDK; use the extension)
-- MLflow: `?experiment=<id>` exports to a local MLflow server. Also turns on [multimodal previews](./docs/telemetry-reference.md#multimodal-content). `?otlp=<url>` points anywhere else.
+- MLflow: pick **MLflow** in the export form at the top of the page, set the experiment ID and click **Apply & reload**. This exports to a local MLflow server and turns on [multimodal previews](./docs/telemetry-reference.md#multimodal-content). The choice is remembered in `localStorage`. The **OTLP URL** field points anywhere else.
+- Query parameters still work as one-off overrides: `?experiment=<id>` and `?otlp=<url>`.
 
 ```bash
-pnpm mlflow   # http://localhost:5000, then open ?experiment=0
+pnpm mlflow   # http://localhost:5000, then pick MLflow in the playground
 ```
 
 
