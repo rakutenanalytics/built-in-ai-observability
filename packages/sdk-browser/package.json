@@ -25,10 +25,10 @@
     "@built-in-ai-obs/core": "workspace:*",
     "@built-in-ai-obs/instrumentation-prompt-api": "workspace:*",
     "@opentelemetry/api": "catalog:",
+    "@opentelemetry/core": "catalog:",
     "@opentelemetry/exporter-trace-otlp-http": "catalog:",
     "@opentelemetry/resources": "catalog:",
-    "@opentelemetry/sdk-trace-base": "catalog:",
-    "@opentelemetry/sdk-trace-web": "catalog:"
+    "@opentelemetry/sdk-trace": "catalog:"
   },
   "devDependencies": {
     "tsdown": "catalog:"

@@ -26,7 +26,7 @@
     "@opentelemetry/api": "catalog:"
   },
   "devDependencies": {
-    "@opentelemetry/sdk-trace-base": "catalog:",
+    "@opentelemetry/sdk-trace": "catalog:",
     "tsdown": "catalog:",
     "vitest": "catalog:"
   }

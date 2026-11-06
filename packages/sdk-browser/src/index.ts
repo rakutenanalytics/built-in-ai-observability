@@ -4,10 +4,19 @@ import {
   type InstrumentationConfig,
 } from "@built-in-ai-obs/core";
 import { PromptApiInstrumentation } from "@built-in-ai-obs/instrumentation-prompt-api";
+import { context, propagation, trace } from "@opentelemetry/api";
+import {
+  CompositePropagator,
+  W3CBaggagePropagator,
+  W3CTraceContextPropagator,
+} from "@opentelemetry/core";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { resourceFromAttributes } from "@opentelemetry/resources";
-import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
-import { WebTracerProvider } from "@opentelemetry/sdk-trace-web";
+import {
+  BatchSpanProcessor,
+  StackContextManager,
+  TracerProvider,
+} from "@opentelemetry/sdk-trace";
 
 /**
  * Re-exported because tool use changed what a turn resolves to: `prompt()`
@@ -37,8 +46,26 @@ export interface BuiltInAIObservabilityOptions
   serviceName?: string;
 }
 
+/**
+ * What `WebTracerProvider.register()` did before the 3.x SDK dropped it: make
+ * this the global tracer provider, install a browser context manager, and
+ * propagate W3C trace context and baggage.
+ */
+function registerGlobalProvider(provider: TracerProvider): void {
+  trace.setGlobalTracerProvider(provider);
+  context.setGlobalContextManager(new StackContextManager().enable());
+  propagation.setGlobalPropagator(
+    new CompositePropagator({
+      propagators: [
+        new W3CTraceContextPropagator(),
+        new W3CBaggagePropagator(),
+      ],
+    })
+  );
+}
+
 export class BuiltInAIObservability {
-  private provider: WebTracerProvider | null = null;
+  private provider: TracerProvider | null = null;
   private instrumentation: PromptApiInstrumentation | null = null;
   private teardown: Array<() => void> = [];
   private readonly options: BuiltInAIObservabilityOptions;
@@ -65,20 +92,23 @@ export class BuiltInAIObservability {
       ...instrumentationConfig
     } = this.options;
 
-    this.provider = new WebTracerProvider({
+    this.provider = new TracerProvider({
       resource: resourceFromAttributes({
         "service.name": serviceName,
         ...browserResourceAttributes(),
       }),
       spanProcessors: [
-        new BatchSpanProcessor(
-          new OTLPTraceExporter({ headers: otlpHeaders, url: otlpUrl })
-        ),
+        new BatchSpanProcessor({
+          exporter: new OTLPTraceExporter({
+            headers: otlpHeaders,
+            url: otlpUrl,
+          }),
+        }),
       ],
     });
 
     if (registerGlobal) {
-      this.provider.register();
+      registerGlobalProvider(this.provider);
     }
 
     if (prompt) {

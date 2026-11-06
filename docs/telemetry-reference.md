@@ -196,7 +196,7 @@ Parents are threaded through `SessionState` rather than ambient OpenTelemetry co
 
 ## Extension pipeline
 
-The Built-in AI Observability SDK and the extension share `PromptApiInstrumentation`. The SDK registers a `WebTracerProvider` with an OTLP exporter. The extension registers a minimal provider with `ExtensionSpanExporter` in the MAIN world at `document_start`.
+The Built-in AI Observability SDK and the extension share `PromptApiInstrumentation`. The SDK registers a `TracerProvider` (from `@opentelemetry/sdk-trace`) with an OTLP exporter. The extension registers a minimal provider with `ExtensionSpanExporter` in the MAIN world at `document_start`.
 
 ```text
 MAIN world (interceptor.js)

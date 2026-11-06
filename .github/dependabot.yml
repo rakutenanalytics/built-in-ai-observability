@@ -8,9 +8,9 @@ updates:
     # Routine bumps arrive as one PR; majors stay separate so a breaking
     # change is never buried in a batch.
     groups:
-      # The @opentelemetry/* packages declare tight peer ranges on each other
-      # (e.g. SDK 2.x requires api <1.10, exporter 0.300 pulls SDK 3.x), so they
-      # must move together or not at all.
+      # The @opentelemetry/* packages pin each other tightly (exporter 0.301 depends
+      # on sdk-trace 3.1.0, which pins core/resources 3.1.0 and an api range), so
+      # they must move together or not at all.
       opentelemetry:
         patterns: [ "@opentelemetry/*" ]
       npm:

@@ -1,10 +1,10 @@
-import type { HrTime, TracerProvider } from "@opentelemetry/api";
+import type { HrTime } from "@opentelemetry/api";
 import {
-  BasicTracerProvider,
   InMemorySpanExporter,
   type ReadableSpan,
   SimpleSpanProcessor,
-} from "@opentelemetry/sdk-trace-base";
+  TracerProvider,
+} from "@opentelemetry/sdk-trace";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   PromptApiInstrumentation,
@@ -193,7 +193,7 @@ async function drain(
 
 describe("PromptApiInstrumentation", () => {
   let exporter: InMemorySpanExporter;
-  let provider: BasicTracerProvider;
+  let provider: TracerProvider;
   let instrumentation: PromptApiInstrumentation;
   let mockSession: ReturnType<typeof createMockSession>;
   let originalCreate: typeof LanguageModel.create;
@@ -214,8 +214,8 @@ describe("PromptApiInstrumentation", () => {
 
   beforeEach(() => {
     exporter = new InMemorySpanExporter();
-    provider = new BasicTracerProvider({
-      spanProcessors: [new SimpleSpanProcessor(exporter)],
+    provider = new TracerProvider({
+      spanProcessors: [new SimpleSpanProcessor({ exporter })],
     });
 
     mockSession = createMockSession();
