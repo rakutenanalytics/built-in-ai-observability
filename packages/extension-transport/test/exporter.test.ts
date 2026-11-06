@@ -4,10 +4,7 @@ import {
   SpanStatusCode,
   trace,
 } from "@opentelemetry/api";
-import {
-  BasicTracerProvider,
-  SimpleSpanProcessor,
-} from "@opentelemetry/sdk-trace-base";
+import { SimpleSpanProcessor, TracerProvider } from "@opentelemetry/sdk-trace";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ExtensionSpanExporter } from "../src/index.js";
 import {
@@ -26,17 +23,17 @@ const SPAN_ID_HEX = /^[0-9a-f]{16}$/u;
  */
 describe("ExtensionSpanExporter", () => {
   let messages: SpanMessage[];
-  let provider: BasicTracerProvider;
+  let provider: TracerProvider;
 
   beforeEach(() => {
     messages = [];
-    provider = new BasicTracerProvider({
+    provider = new TracerProvider({
       spanProcessors: [
-        new SimpleSpanProcessor(
-          new ExtensionSpanExporter({
+        new SimpleSpanProcessor({
+          exporter: new ExtensionSpanExporter({
             postMessage: (message) => messages.push(message),
-          })
-        ),
+          }),
+        }),
       ],
     });
   });
@@ -107,8 +104,8 @@ describe("ExtensionSpanExporter", () => {
 
     try {
       const exporter = new ExtensionSpanExporter();
-      const local = new BasicTracerProvider({
-        spanProcessors: [new SimpleSpanProcessor(exporter)],
+      const local = new TracerProvider({
+        spanProcessors: [new SimpleSpanProcessor({ exporter })],
       });
       const span = local.getTracer("test").startSpan("web_ai.create_session");
       span.end();

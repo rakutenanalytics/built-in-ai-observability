@@ -2,8 +2,7 @@ import { browserResourceAttributes } from "@built-in-ai-obs/core";
 import { ExtensionSpanExporter } from "@built-in-ai-obs/extension-transport";
 import { PromptApiInstrumentation } from "@built-in-ai-obs/instrumentation-prompt-api";
 import { resourceFromAttributes } from "@opentelemetry/resources";
-import { SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
-import { WebTracerProvider } from "@opentelemetry/sdk-trace-web";
+import { SimpleSpanProcessor, TracerProvider } from "@opentelemetry/sdk-trace";
 
 const INSTALLED_KEY = "__webAiOtelInstalled";
 
@@ -14,12 +13,14 @@ const globals = globalThis as Record<string, unknown>;
 if (!globals[INSTALLED_KEY]) {
   globals[INSTALLED_KEY] = true;
 
-  const provider = new WebTracerProvider({
+  const provider = new TracerProvider({
     resource: resourceFromAttributes({
       "service.name": "web-ai-page",
       ...browserResourceAttributes(),
     }),
-    spanProcessors: [new SimpleSpanProcessor(new ExtensionSpanExporter())],
+    spanProcessors: [
+      new SimpleSpanProcessor({ exporter: new ExtensionSpanExporter() }),
+    ],
   });
 
   // Deliberately not calling provider.register(): that would replace the
