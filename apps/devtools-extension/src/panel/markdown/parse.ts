@@ -1,12 +1,12 @@
 import type { HeadingLevel, MarkdownBlock, MarkdownInline } from "./types.js";
 
-const FENCE_OPEN = /^```([\w-]*)?\s*$/;
-const FENCE_CLOSE = /^```\s*$/;
-const HEADING = /^(#{1,6})\s+(.+)$/;
-const HORIZONTAL_RULE = /^(-{3,}|\*{3,}|_{3,})\s*$/;
-const UNORDERED_LIST = /^[-*+]\s+(.+)$/;
-const ORDERED_LIST = /^\d+\.\s+(.+)$/;
-const TABLE_SEPARATOR_CELL = /^:?-{1,}:?$/;
+const FENCE_OPEN = /^```([\w-]*)?\s*$/u;
+const FENCE_CLOSE = /^```\s*$/u;
+const HEADING = /^(#{1,6})\s+(.+)$/u;
+const HORIZONTAL_RULE = /^(-{3,}|\*{3,}|_{3,})\s*$/u;
+const UNORDERED_LIST = /^[-*+]\s+(.+)$/u;
+const ORDERED_LIST = /^\d+\.\s+(.+)$/u;
+const TABLE_SEPARATOR_CELL = /^:?-{1,}:?$/u;
 
 function readLinkDestination(
   text: string,
@@ -281,7 +281,7 @@ function parseParagraphBlock(
 
 /** Parses a markdown string into blocks. Plain text becomes paragraph blocks. */
 export function parseMarkdown(text: string): MarkdownBlock[] {
-  const lines = text.replace(/\r\n/g, "\n").split("\n");
+  const lines = text.replace(/\r\n/gu, "\n").split("\n");
   const blocks: MarkdownBlock[] = [];
   let index = 0;
 

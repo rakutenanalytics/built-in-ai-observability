@@ -1,8 +1,8 @@
 import type { AttributeValue } from "@opentelemetry/api";
 import { WEB_AI } from "../semantic-conventions/attributes.js";
 
-const NOT_A_BRAND = /[^a-z]/gi;
-const CHROMIUM_BRAND = /^chromium$/i;
+const NOT_A_BRAND = /[^a-z]/giu;
+const CHROMIUM_BRAND = /^chromium$/iu;
 
 interface NavigatorUADataBrand {
   brand: string;

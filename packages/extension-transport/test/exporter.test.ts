@@ -17,8 +17,8 @@ import {
   validateSerializedSpan,
 } from "../src/protocol.js";
 
-const TRACE_ID_HEX = /^[0-9a-f]{32}$/;
-const SPAN_ID_HEX = /^[0-9a-f]{16}$/;
+const TRACE_ID_HEX = /^[0-9a-f]{32}$/u;
+const SPAN_ID_HEX = /^[0-9a-f]{16}$/u;
 
 /**
  * Guards the seam between the OpenTelemetry SDK and the extension wire format:

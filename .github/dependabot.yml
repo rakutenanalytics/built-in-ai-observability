@@ -8,9 +8,15 @@ updates:
     # Routine bumps arrive as one PR; majors stay separate so a breaking
     # change is never buried in a batch.
     groups:
+      # The @opentelemetry/* packages declare tight peer ranges on each other
+      # (e.g. SDK 2.x requires api <1.10, exporter 0.300 pulls SDK 3.x), so they
+      # must move together or not at all.
+      opentelemetry:
+        patterns: [ "@opentelemetry/*" ]
       npm:
-        patterns: ["*"]
-        update-types: ["minor", "patch"]
+        patterns: [ "*" ]
+        exclude-patterns: [ "@opentelemetry/*" ]
+        update-types: [ "minor", "patch" ]
 
   - package-ecosystem: "github-actions"
     directory: "/"
@@ -18,5 +24,5 @@ updates:
       interval: "weekly"
     groups:
       github-actions:
-        patterns: ["*"]
-        update-types: ["minor", "patch"]
+        patterns: [ "*" ]
+        update-types: [ "minor", "patch" ]

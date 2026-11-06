@@ -12,6 +12,18 @@
       "chrome"
     ]
   },
+  "linter": {
+    "rules": {
+      // Rules newly enabled by Ultracite 8.1 / Biome 2.6. Existing code predates
+      // them; revisit in a dedicated cleanup rather than inside a dependency bump.
+      "style": {
+        "useDomQuerySelector": "off",
+        "useNamedCaptureGroup": "off",
+        "useThisInClassMethods": "off"
+      },
+      "suspicious": { "useBaseline": "off" }
+    }
+  },
   "overrides": [
     {
       // Barrel files are the intentional public API surface of each package.

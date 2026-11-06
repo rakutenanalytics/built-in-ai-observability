@@ -2,7 +2,7 @@ import { defineConfig } from "tsdown";
 
 const extensionBuildDefaults = {
   deps: {
-    alwaysBundle: [/.*/],
+    alwaysBundle: [/.*/u],
     onlyBundle: false,
   },
   dts: false,
