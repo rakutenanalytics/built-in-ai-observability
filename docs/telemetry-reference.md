@@ -128,13 +128,25 @@ Not set by design: `gen_ai.request.model` and `gen_ai.usage.*`. The Prompt API e
 | `web_ai.model.download_*`               | Model download progress and duration                |
 | `web_ai.request.sampling_mode`          | Prompt API sampling config                          |
 | `web_ai.runtime.browser.*`              | Browser name and version                            |
-| `web_ai.runtime.device_memory_gib`      | Coarse hardware hint                                |
+| `web_ai.runtime.cpu_performance_tier`   | Coarse CPU performance tier from `navigator.cpuPerformance` |
+| `web_ai.runtime.device_memory_gib`      | Approximate device memory in GiB from `navigator.deviceMemory` |
 | `web_ai.session.*`                      | Session id, parent id, expected inputs/outputs      |
 | `web_ai.stream.chunk_count`             | Streaming chunk count                               |
 | `web_ai.tool.*`                         | Tool declarations and per-turn call/response counts |
 
 
 `gen_ai.conversation.id`, `session.id`, and `web_ai.session.id` carry the same value. Clones keep the conversation id and get a new `web_ai.session.id` with `web_ai.session.parent_id` pointing at the source.
+
+### Runtime resource attributes
+
+The SDK and extension collect `web_ai.runtime.*` on the OpenTelemetry resource when the tracer provider starts. Every Prompt API span is associated with that resource. These values describe the browser and device rather than an individual request, following [OpenTelemetry resource practices](https://opentelemetry.io/docs/specs/otel/resource/sdk/).
+
+Neither the [GenAI conventions](https://github.com/open-telemetry/semantic-conventions-genai) nor the standard browser/device conventions define attributes for these coarse hardware hints. They use the existing experimental `web_ai.runtime.*` namespace, following [OpenTelemetry custom naming guidance](https://opentelemetry.io/docs/specs/semconv/general/naming/#recommendations-for-application-developers).
+
+- `web_ai.runtime.cpu_performance_tier` is the integer returned by the experimental [CPU Performance API](https://github.com/WICG/cpu-performance). Higher tiers indicate more capable CPUs. `0` means the browser could not classify the CPU. Future tiers above `4` are preserved. This is not a core count, clock speed, or utilization measurement.
+- `web_ai.runtime.device_memory_gib` is the positive, finite number returned by [`navigator.deviceMemory`](https://developer.mozilla.org/en-US/docs/Web/API/Navigator/deviceMemory), in GiB. The browser rounds and clamps this estimate for privacy. It is not available memory, model memory usage, or an exact physical-memory measurement.
+
+Unsupported or invalid values are omitted. Neither attribute is a `gen_ai.request.*` parameter. The CPU tier also does not match `host.cpu.*` attributes, and the coarse memory estimate is kept separate from exact host memory measurements.
 
 ### Model download state
 

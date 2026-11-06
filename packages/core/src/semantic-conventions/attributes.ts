@@ -39,6 +39,7 @@ export const WEB_AI = {
   CONTEXT_USAGE_DELTA: "web_ai.context.usage_delta_tokens",
   CONTEXT_UTILIZATION_AFTER: "web_ai.context.utilization_after",
   CONTEXT_WINDOW: "web_ai.context.window_tokens",
+  CPU_PERFORMANCE_TIER: "web_ai.runtime.cpu_performance_tier",
   DEVICE_MEMORY_GIB: "web_ai.runtime.device_memory_gib",
   DOWNLOAD_DURATION: "web_ai.model.download_duration",
   DOWNLOAD_OBSERVED: "web_ai.model.download_observed",

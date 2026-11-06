@@ -19,6 +19,7 @@ interface NavigatorUAData {
 }
 
 interface ExtendedNavigator extends Navigator {
+  cpuPerformance?: number;
   deviceMemory?: number;
   userAgentData?: NavigatorUAData;
 }
@@ -65,8 +66,21 @@ export function browserResourceAttributes(): BrowserResourceAttributes {
     "user_agent.original": navigator.userAgent,
   };
 
-  const { deviceMemory } = nav;
-  if (deviceMemory !== undefined && Number.isFinite(deviceMemory)) {
+  // Hardware hints describe the runtime, so keep them on the resource shared
+  // by all spans. CPU performance is a tier, not a core count or utilization.
+  const { cpuPerformance, deviceMemory } = nav;
+  if (
+    cpuPerformance !== undefined &&
+    Number.isInteger(cpuPerformance) &&
+    cpuPerformance >= 0
+  ) {
+    attributes[WEB_AI.CPU_PERFORMANCE_TIER] = cpuPerformance;
+  }
+  if (
+    deviceMemory !== undefined &&
+    Number.isFinite(deviceMemory) &&
+    deviceMemory > 0
+  ) {
     attributes[WEB_AI.DEVICE_MEMORY_GIB] = deviceMemory;
   }
 
