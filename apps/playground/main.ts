@@ -83,40 +83,40 @@ const otlpHeaders: Record<string, string> = useMlflow
   ? { "x-mlflow-experiment-id": settings.experimentId }
   : {};
 
-const modeInfo = document.getElementById("mode-info");
-const exportForm = document.getElementById("export-form") as HTMLFormElement;
-const destinationSelect = document.getElementById(
-  "export-destination"
+const modeInfo = document.querySelector("#mode-info");
+const exportForm = document.querySelector("#export-form") as HTMLFormElement;
+const destinationSelect = document.querySelector(
+  "#export-destination"
 ) as HTMLSelectElement;
-const experimentField = document.getElementById(
-  "export-experiment-field"
+const experimentField = document.querySelector(
+  "#export-experiment-field"
 ) as HTMLElement;
-const experimentInput = document.getElementById(
-  "export-experiment"
+const experimentInput = document.querySelector(
+  "#export-experiment"
 ) as HTMLInputElement;
-const urlInput = document.getElementById("export-url") as HTMLInputElement;
-const output = document.getElementById("output");
-const promptInput = document.getElementById("prompt") as HTMLTextAreaElement;
-const form = document.getElementById("form") as HTMLFormElement;
+const urlInput = document.querySelector("#export-url") as HTMLInputElement;
+const output = document.querySelector("#output");
+const promptInput = document.querySelector("#prompt") as HTMLTextAreaElement;
+const form = document.querySelector("#form") as HTMLFormElement;
 
-const imagePromptInput = document.getElementById(
-  "image-prompt"
+const imagePromptInput = document.querySelector(
+  "#image-prompt"
 ) as HTMLTextAreaElement;
-const imageFileInput = document.getElementById(
-  "image-file"
+const imageFileInput = document.querySelector(
+  "#image-file"
 ) as HTMLInputElement;
-const imagePreview = document.getElementById(
-  "image-preview"
+const imagePreview = document.querySelector(
+  "#image-preview"
 ) as HTMLImageElement;
 
-const audioPromptInput = document.getElementById(
-  "audio-prompt"
+const audioPromptInput = document.querySelector(
+  "#audio-prompt"
 ) as HTMLTextAreaElement;
-const audioFileInput = document.getElementById(
-  "audio-file"
+const audioFileInput = document.querySelector(
+  "#audio-file"
 ) as HTMLInputElement;
-const audioPreview = document.getElementById(
-  "audio-preview"
+const audioPreview = document.querySelector(
+  "#audio-preview"
 ) as HTMLAudioElement;
 
 type PlaygroundMode = "audio" | "image" | "text";
@@ -216,7 +216,7 @@ for (const button of document.querySelectorAll<HTMLButtonElement>(
 
 promptInput.placeholder = DEFAULT_TOOL_PROMPT;
 
-const toolExamples = document.getElementById("tool-examples");
+const toolExamples = document.querySelector("#tool-examples");
 if (toolExamples) {
   for (const example of TOOL_EXAMPLE_PROMPTS) {
     const button = document.createElement("button");
@@ -516,7 +516,7 @@ if ("LanguageModel" in globalThis) {
     }
   });
 
-  document.getElementById("stream")?.addEventListener("click", async () => {
+  document.querySelector("#stream")?.addEventListener("click", async () => {
     const prompt = promptInput.value.trim();
     if (!prompt) {
       return;
@@ -531,7 +531,7 @@ if ("LanguageModel" in globalThis) {
     }
   });
 
-  document.getElementById("tool-call")?.addEventListener("click", async () => {
+  document.querySelector("#tool-call")?.addEventListener("click", async () => {
     if (!toolUseSupported()) {
       setOutput(
         "Tool use is not enabled. Turn on chrome://flags/#prompt-api-tool-use " +
@@ -547,7 +547,7 @@ if ("LanguageModel" in globalThis) {
     }
   });
 
-  document.getElementById("clone")?.addEventListener("click", async () => {
+  document.querySelector("#clone")?.addEventListener("click", async () => {
     if (!session) {
       await ensureSession();
     }
@@ -557,7 +557,7 @@ if ("LanguageModel" in globalThis) {
     }
   });
 
-  document.getElementById("reset")?.addEventListener("click", async () => {
+  document.querySelector("#reset")?.addEventListener("click", async () => {
     session?.destroy();
     session = null;
     toolSession?.destroy();
@@ -578,7 +578,7 @@ if ("LanguageModel" in globalThis) {
     await ensureSession();
   });
 
-  document.getElementById("image-send")?.addEventListener("click", async () => {
+  document.querySelector("#image-send")?.addEventListener("click", async () => {
     try {
       await runImagePrompt(false);
     } catch (err) {
@@ -587,7 +587,7 @@ if ("LanguageModel" in globalThis) {
   });
 
   document
-    .getElementById("image-stream")
+    .querySelector("#image-stream")
     ?.addEventListener("click", async () => {
       try {
         await runImagePrompt(true);
@@ -597,7 +597,7 @@ if ("LanguageModel" in globalThis) {
     });
 
   document
-    .getElementById("audio-record")
+    .querySelector("#audio-record")
     ?.addEventListener("click", async () => {
       setOutput("Recording for 5 seconds…");
       try {
@@ -608,7 +608,7 @@ if ("LanguageModel" in globalThis) {
       }
     });
 
-  document.getElementById("audio-send")?.addEventListener("click", async () => {
+  document.querySelector("#audio-send")?.addEventListener("click", async () => {
     try {
       await runAudioPrompt(false);
     } catch (err) {
@@ -617,7 +617,7 @@ if ("LanguageModel" in globalThis) {
   });
 
   document
-    .getElementById("audio-stream")
+    .querySelector("#audio-stream")
     ?.addEventListener("click", async () => {
       try {
         await runAudioPrompt(true);

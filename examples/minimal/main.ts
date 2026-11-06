@@ -10,8 +10,8 @@ const observability = new BuiltInAIObservability({
 });
 await observability.start();
 
-const out = document.getElementById("out");
-document.getElementById("run")?.addEventListener("click", async () => {
+const out = document.querySelector("#out");
+document.querySelector("#run")?.addEventListener("click", async () => {
   if (!("LanguageModel" in globalThis)) {
     if (out) {
       out.textContent = "LanguageModel not available.";
