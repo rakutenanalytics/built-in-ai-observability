@@ -1,11 +1,11 @@
 import type { HeadingLevel, MarkdownBlock, MarkdownInline } from "./types.js";
 
-const FENCE_OPEN = /^```([\w-]*)?\s*$/u;
+const FENCE_OPEN = /^```(?<language>[\w-]*)?\s*$/u;
 const FENCE_CLOSE = /^```\s*$/u;
-const HEADING = /^(#{1,6})\s+(.+)$/u;
-const HORIZONTAL_RULE = /^(-{3,}|\*{3,}|_{3,})\s*$/u;
-const UNORDERED_LIST = /^[-*+]\s+(.+)$/u;
-const ORDERED_LIST = /^\d+\.\s+(.+)$/u;
+const HEADING = /^(?<marks>#{1,6})\s+(?<text>.+)$/u;
+const HORIZONTAL_RULE = /^(?:-{3,}|\*{3,}|_{3,})\s*$/u;
+const UNORDERED_LIST = /^[-*+]\s+(?<text>.+)$/u;
+const ORDERED_LIST = /^\d+\.\s+(?<text>.+)$/u;
 const TABLE_SEPARATOR_CELL = /^:?-{1,}:?$/u;
 
 function readLinkDestination(
@@ -189,7 +189,8 @@ function parseCodeBlock(
   lines: string[],
   start: number
 ): { block?: MarkdownBlock; next: number } {
-  const language = lines[start].match(FENCE_OPEN)?.[1] || undefined;
+  const language =
+    lines[start].match(FENCE_OPEN)?.groups?.language || undefined;
   let index = start + 1;
   const codeLines: string[] = [];
   while (index < lines.length && !FENCE_CLOSE.test(lines[index])) {
@@ -225,7 +226,7 @@ function parseListBlock(
     if (!item) {
       break;
     }
-    items.push(parseInlines(item[1]));
+    items.push(parseInlines(item.groups?.text ?? ""));
     index += 1;
   }
 
@@ -300,8 +301,8 @@ export function parseMarkdown(text: string): MarkdownBlock[] {
     const heading = line.match(HEADING);
     if (heading) {
       blocks.push({
-        inlines: parseInlines(heading[2]),
-        level: heading[1].length as HeadingLevel,
+        inlines: parseInlines(heading.groups?.text ?? ""),
+        level: (heading.groups?.marks?.length ?? 1) as HeadingLevel,
         type: "heading",
       });
       index += 1;

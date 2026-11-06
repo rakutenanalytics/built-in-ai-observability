@@ -79,6 +79,7 @@ export class ExtensionSpanExporter implements SpanExporter {
     }
   }
 
+  // biome-ignore lint/style/useThisInClassMethods: part of the SpanExporter contract
   shutdown(): Promise<void> {
     return Promise.resolve();
   }
