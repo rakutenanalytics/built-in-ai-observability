@@ -5,7 +5,7 @@ export const SPAN_MESSAGE_TYPE = "built-in-ai-obs:span";
 const TRACE_ID_LENGTH = 32;
 const SPAN_ID_LENGTH = 16;
 const HR_TIME_PARTS = 2;
-const HEX_ID = /^[0-9a-f]+$/;
+const HEX_ID = /^[0-9a-f]+$/u;
 
 /** A span as reported by the instrumented page. Everything here is untrusted. */
 export interface SerializedSpan {

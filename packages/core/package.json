@@ -25,6 +25,7 @@
     "@opentelemetry/api": "catalog:"
   },
   "devDependencies": {
+    "tsdown": "catalog:",
     "vitest": "catalog:"
   }
 }
