@@ -44,7 +44,7 @@ async function loadSpans(trace: TraceSummary): Promise<StoredSpan[]> {
 }
 
 const drawer = createTraceDrawer(
-  document.getElementById("drawer-host") ?? document.body,
+  document.querySelector("#drawer-host") ?? document.body,
   loadSpans
 );
 
@@ -66,7 +66,7 @@ function openTrace(trace: TraceSummary): void {
 }
 
 async function load(): Promise<void> {
-  const listEl = document.getElementById("trace-list");
+  const listEl = document.querySelector("#trace-list");
   if (!listEl) {
     return;
   }
@@ -113,7 +113,7 @@ function showScope(): void {
   chrome.devtools.inspectedWindow.eval(
     "location.origin",
     (result: unknown, error) => {
-      const scope = document.getElementById("scope");
+      const scope = document.querySelector("#scope");
       if (!scope) {
         return;
       }
@@ -125,7 +125,7 @@ function showScope(): void {
 }
 
 document
-  .getElementById("group-by-session")
+  .querySelector("#group-by-session")
   ?.addEventListener("click", (event) => {
     groupBySession = !groupBySession;
     (event.currentTarget as HTMLElement).setAttribute(
@@ -135,11 +135,11 @@ document
     load().catch(console.error);
   });
 
-document.getElementById("refresh")?.addEventListener("click", () => {
+document.querySelector("#refresh")?.addEventListener("click", () => {
   load().catch(console.error);
 });
 
-document.getElementById("clear")?.addEventListener("click", () => {
+document.querySelector("#clear")?.addEventListener("click", () => {
   (async () => {
     await request({ tabId: inspectedTabId, type: "clear-traces" });
     drawer.close();
@@ -147,7 +147,7 @@ document.getElementById("clear")?.addEventListener("click", () => {
   })().catch(console.error);
 });
 
-document.getElementById("export")?.addEventListener("click", () => {
+document.querySelector("#export")?.addEventListener("click", () => {
   (async () => {
     const { spans } = await request({
       tabId: inspectedTabId,

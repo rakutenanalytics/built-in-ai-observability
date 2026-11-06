@@ -12,19 +12,17 @@
       "chrome"
     ]
   },
-  "linter": {
-    "rules": {
-      // Rules newly enabled by Ultracite 8.1 / Biome 2.6. Existing code predates
-      // them; revisit in a dedicated cleanup rather than inside a dependency bump.
-      "style": {
-        "useDomQuerySelector": "off",
-        "useNamedCaptureGroup": "off",
-        "useThisInClassMethods": "off"
-      },
-      "suspicious": { "useBaseline": "off" }
-    }
-  },
   "overrides": [
+    {
+      // The panel only ever runs inside Chrome DevTools, so Baseline (cross-browser)
+      // availability is not a constraint for its stylesheet.
+      "includes": ["apps/devtools-extension/static/panel.css"],
+      "linter": {
+        "rules": {
+          "suspicious": { "useBaseline": "off" }
+        }
+      }
+    },
     {
       // Barrel files are the intentional public API surface of each package.
       "includes": ["**/src/index.ts", "**/src/*/index.ts"],
