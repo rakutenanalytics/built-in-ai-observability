@@ -29,5 +29,8 @@
     "@opentelemetry/resources": "catalog:",
     "@opentelemetry/sdk-trace-base": "catalog:",
     "@opentelemetry/sdk-trace-web": "catalog:"
+  },
+  "devDependencies": {
+    "tsdown": "catalog:"
   }
 }

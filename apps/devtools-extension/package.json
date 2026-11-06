@@ -21,6 +21,7 @@
   "devDependencies": {
     "@types/chrome": "catalog:",
     "fake-indexeddb": "catalog:",
+    "tsdown": "catalog:",
     "vitest": "catalog:"
   }
 }
