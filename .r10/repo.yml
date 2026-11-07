@@ -1,0 +1,18 @@
+schema_version: "1.0"
+
+ownership:
+  org_id: "ORGxxxxxx"
+
+component:
+  name: "built-in-ai-observability"
+  production_impacting: true
+  kind: "service"
+
+build:
+  language: "typescript"
+  cicd_providers: ["github-actions"]
+  production_branch: "main"
+  release_convention: "n/a"
+  package_registries: ["n/a"]
+
+psam_id: "PSAM-00000"
