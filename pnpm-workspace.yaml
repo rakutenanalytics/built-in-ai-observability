@@ -11,7 +11,7 @@ allowBuilds:
   lefthook: true
 
 catalog:
-  "@biomejs/biome": ^2.6.4
+  "@biomejs/biome": ^2.6.6
   "@opentelemetry/api": ^1.10.0
   "@opentelemetry/core": ^3.1.0
   "@opentelemetry/exporter-trace-otlp-http": ^0.301.0
@@ -19,11 +19,11 @@ catalog:
   "@opentelemetry/sdk-trace": ^3.1.0
   "@types/chrome": ^0.3.7
   "@types/node": ^26.6.6
-  fake-indexeddb: ^6.2.7
+  fake-indexeddb: ^6.2.8
   lefthook: ^2.2.2
-  tsdown: ^0.23.4
+  tsdown: ^0.23.7
   turbo: ^2.11.10
   typescript: ^7.0.2
   ultracite: ^8.1.1
-  vite: ^8.3.5
+  vite: ^8.3.7
   vitest: ^5.1.0
