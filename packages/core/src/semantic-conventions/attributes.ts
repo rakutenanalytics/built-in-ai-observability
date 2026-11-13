@@ -48,6 +48,11 @@ export const WEB_AI = {
   EXCHANGE_TOOL_CALL_COUNT: "web_ai.exchange.tool_call_count",
   /** Totals for a whole exchange, recorded on its `invoke_agent` span. */
   EXCHANGE_TURN_COUNT: "web_ai.exchange.turn_count",
+  /**
+   * Worst Compute Pressure state seen while the span was open. Absent when the
+   * browser gave no fresh reading, which is not the same as "nominal".
+   */
+  PRESSURE_CPU_MAX: "web_ai.runtime.pressure.cpu.max",
   SAMPLING_MODE: "web_ai.request.sampling_mode",
   SESSION_EXPECTED_INPUTS: "web_ai.session.expected_inputs",
   SESSION_EXPECTED_OUTPUTS: "web_ai.session.expected_outputs",

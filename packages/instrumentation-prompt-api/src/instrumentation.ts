@@ -9,6 +9,7 @@ import {
   type InstrumentationConfig,
   OPERATION_INVOKE_AGENT,
   PROMPT_API_NAME,
+  PressureMonitor,
   readAssistantTurn,
   readContextUsage,
   readContextWindow,
@@ -111,7 +112,8 @@ export function wrapSession(
   state: SessionState,
   tracer: Tracer,
   config: InstrumentationConfig,
-  providerName: string
+  providerName: string,
+  pressure?: PressureMonitor
 ): LanguageModel {
   attachOverflowListeners(session, state);
 
@@ -283,6 +285,7 @@ export function wrapSession(
       parent
     );
     const spanContext = activate(parent, span);
+    const endPressure = pressure?.begin();
 
     return context.with(spanContext, async () => {
       let turn: AssistantTurn | undefined;
@@ -334,6 +337,9 @@ export function wrapSession(
         // Unset only when the turn failed before it could be timed.
         const at = endedAt ?? spanTimestamp();
         state.activeSpans.delete(span);
+        if (endPressure) {
+          span.setAttributes(endPressure());
+        }
         span.end(at);
         settleTurn(turn, at);
       }
@@ -358,6 +364,7 @@ export function wrapSession(
       parent
     );
     const spanContext = activate(parent, span);
+    const endPressure = pressure?.begin();
 
     const startedAt = performance.now();
     let firstChunkAt: number | null = null;
@@ -442,6 +449,9 @@ export function wrapSession(
             );
           }
           state.activeSpans.delete(span);
+          if (endPressure) {
+            span.setAttributes(endPressure());
+          }
           span.end(at);
           settleTurn(turn, at);
         }
@@ -486,7 +496,14 @@ export function wrapSession(
         [...state.tools.values()]
       );
       span.setStatus({ code: SpanStatusCode.OK });
-      return wrapSession(cloned, childState, tracer, config, providerName);
+      return wrapSession(
+        cloned,
+        childState,
+        tracer,
+        config,
+        providerName,
+        pressure
+      );
     } catch (err) {
       recordError(span, err);
       throw err;
@@ -530,6 +547,7 @@ export class PromptApiInstrumentation {
   private readonly config: InstrumentationConfig;
   private readonly tracer: Tracer;
   private readonly providerName: string;
+  private readonly pressure?: PressureMonitor;
   private enabled = false;
   private originalCreate?: CreateFn;
   private originalAvailability?: AvailabilityFn;
@@ -545,6 +563,9 @@ export class PromptApiInstrumentation {
 
     this.config = { ...DEFAULT_CAPTURE_CONFIG, ...captureConfig };
     this.providerName = providerName ?? DEFAULT_PROVIDER_NAME;
+    this.pressure = this.config.capturePressure
+      ? new PressureMonitor()
+      : undefined;
     this.tracer = (tracerProvider ?? trace.getTracerProvider()).getTracer(
       tracerName ?? "@built-in-ai-obs/instrumentation-prompt-api",
       tracerVersion ?? "0.1.0"
@@ -568,6 +589,7 @@ export class PromptApiInstrumentation {
       },
       kind: SpanKind.INTERNAL,
     });
+    const endPressure = this.pressure?.begin();
 
     try {
       const session = await original.call(
@@ -584,12 +606,16 @@ export class PromptApiInstrumentation {
         state,
         this.tracer,
         this.config,
-        this.providerName
+        this.providerName,
+        this.pressure
       );
     } catch (err) {
       recordError(span, err);
       throw err;
     } finally {
+      if (endPressure) {
+        span.setAttributes(endPressure());
+      }
       span.end();
     }
   }
@@ -633,6 +659,7 @@ export class PromptApiInstrumentation {
     LanguageModel.availability = (options = {}) =>
       this.tracedAvailability(originalAvailability, options);
 
+    this.pressure?.start();
     this.enabled = true;
   }
 
@@ -646,6 +673,7 @@ export class PromptApiInstrumentation {
     if (this.originalAvailability) {
       LanguageModel.availability = this.originalAvailability;
     }
+    this.pressure?.stop();
     this.enabled = false;
   }
 

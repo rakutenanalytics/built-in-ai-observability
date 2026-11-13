@@ -30,6 +30,12 @@ export interface InstrumentationConfig extends CaptureConfig {
    * attributes remain redacted — previews live only in mlflow.spanInputs.
    */
   captureMultimodalPreview?: boolean;
+  /**
+   * Record Compute Pressure on session and turn spans. Off by default: it
+   * starts a `PressureObserver`, which browsers may disclose to the user.
+   * Chromium reports CPU only, which says little about on-device inference.
+   */
+  capturePressure?: boolean;
   /** Include MLflow preview attributes for backends that use them. */
   includeMlflowPreview?: boolean;
   /**
