@@ -129,6 +129,7 @@ Not set by design: `gen_ai.request.model` and `gen_ai.usage.*`. The Prompt API e
 | `web_ai.request.sampling_mode`          | Prompt API sampling config                          |
 | `web_ai.runtime.browser.*`              | Browser name and version                            |
 | `web_ai.runtime.device_memory_gib`      | Coarse hardware hint                                |
+| `web_ai.runtime.pressure.cpu.max`       | Worst CPU pressure state during the span (opt-in)   |
 | `web_ai.session.*`                      | Session id, parent id, expected inputs/outputs      |
 | `web_ai.stream.chunk_count`             | Streaming chunk count                               |
 | `web_ai.tool.*`                         | Tool declarations and per-turn call/response counts |
@@ -141,6 +142,16 @@ Not set by design: `gen_ai.request.model` and `gen_ai.usage.*`. The Prompt API e
 `web_ai.model.download_observed` is set only when a `downloadprogress` event reports fractional progress. Chrome fires `loaded: 0` followed by `loaded: 1` even when the model is already on disk. Treating the first event as a download start would report a download on every `create()`.
 
 `web_ai.model.download_duration` and the `web_ai.model.download_complete` event are emitted only after real progress. An instantaneous download is reported as no download, not a phantom one.
+
+### Compute pressure (opt-in, draft)
+
+With `capturePressure: true`, `web_ai.create_session` and `generate_content` spans carry `web_ai.runtime.pressure.cpu.max`: the worst of `nominal`, `fair`, `serious`, `critical` that the [Compute Pressure API](https://w3c.github.io/compute-pressure/) reported while the span was open.
+
+- **The attribute is absent when there is no fresh reading, never `nominal`.** Chrome only delivers readings to a focused document, so background tabs report nothing.
+- **It is CPU only.** Chromium's `PressureObserver.knownSources` is `["cpu"]`; `gpu`, `npu`, `thermals` and `memory` are rejected. On-device inference can run largely on the GPU, which this signal cannot see (a WebGPU compute stress left it at `nominal`), so it mainly reflects contention from other work on the machine rather than load from the model. Treat it as a hint that a latency number may be noisy.
+- **Off by default**, because observing may show the user a browser notice. Supported in Chromium 125+ on desktop; absent elsewhere, where the option does nothing.
+
+A new source is one line in `SOURCE_ATTRIBUTES` in `packages/core/src/runtime/pressure.ts`.
 
 ## Multimodal content
 
